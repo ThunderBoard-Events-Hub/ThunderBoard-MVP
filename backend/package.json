@@ -1,0 +1,32 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "ThunderBoard Backend",
+  "homepage": "https://github.com/ThunderBoard-Events-Hub/ThunderBoard-MVP#readme",
+  "bugs": {
+    "url": "https://github.com/ThunderBoard-Events-Hub/ThunderBoard-MVP/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ThunderBoard-Events-Hub/ThunderBoard-MVP.git"
+  },
+  "license": "ISC",
+  "author": "Hasna",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "migrate:up": "node-pg-migrate up",
+    "migrate:down": "node-pg-migrate down",
+    "migrate:create": "node-pg-migrate create",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "node-pg-migrate": "^9.0.0",
+    "nodemon": "^3.1.14",
+    "pg": "^8.23.0"
+  }
+}
