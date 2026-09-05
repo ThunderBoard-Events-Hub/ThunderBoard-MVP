@@ -1,14 +1,14 @@
 import { pool } from "../config/database.js";
 
-// Columns safe to expose to clients — password_hash is deliberately excluded
+// Columns safe to expose to clients — auth0_id is deliberately excluded
 const PUBLIC_COLUMNS = "id, name, email, description, image_url, followers_count, created_at";
 
-export const createOrganization = async ({ name, email, password_hash, description, image_url }) => {
+export const createOrganization = async ({ name, email, auth0_id, description, image_url }) => {
     const { rows } = await pool.query(
-        `INSERT INTO organizations (name, email, password_hash, description, image_url)
+        `INSERT INTO organizations (name, email, auth0_id, description, image_url)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING ${PUBLIC_COLUMNS}`,
-        [name, email, password_hash, description, image_url]
+        [name, email, auth0_id, description, image_url]
     );
     return rows[0];
 };
@@ -23,9 +23,15 @@ export const getOrganizationById = async (id) => {
     return rows[0];
 };
 
-// Includes password_hash — for internal auth/login use only, never expose via a route
-export const getOrganizationByEmail = async (email) => {
-    const { rows } = await pool.query(`SELECT * FROM organizations WHERE email = $1`, [email]);
+// Includes auth0_id — for internal ownership checks only, never expose via a route
+export const getOrganizationByAuth0Id = async (auth0_id) => {
+    const { rows } = await pool.query(`SELECT * FROM organizations WHERE auth0_id = $1`, [auth0_id]);
+    return rows[0];
+};
+
+// Includes auth0_id — for internal ownership checks only, never expose via a route
+export const getOrganizationByIdWithAuth0Id = async (id) => {
+    const { rows } = await pool.query(`SELECT * FROM organizations WHERE id = $1`, [id]);
     return rows[0];
 };
 
@@ -55,6 +61,19 @@ export const incrementFollowersCount = async (id) => {
     const { rows } = await pool.query(
         `UPDATE organizations
          SET followers_count = followers_count + 1
+         WHERE id = $1
+         RETURNING ${PUBLIC_COLUMNS}`,
+        [id]
+    );
+    return rows[0];
+};
+
+// Floored at 0 — followers_count is derived from guest browsers' own localStorage,
+// so there's no server-side record of who's "really" following to reconcile against.
+export const decrementFollowersCount = async (id) => {
+    const { rows } = await pool.query(
+        `UPDATE organizations
+         SET followers_count = GREATEST(followers_count - 1, 0)
          WHERE id = $1
          RETURNING ${PUBLIC_COLUMNS}`,
         [id]

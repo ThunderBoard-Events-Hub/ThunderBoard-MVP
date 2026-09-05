@@ -1,15 +1,27 @@
 import * as organizationModel from "../models/organizationModel.js";
+import { organizationContainerClient } from "../config/storage.js";
+import { uploadImage, deleteImage } from "../services/imageUploadService.js";
 
 export const createOrganization = async (req, res) => {
-    const { name, email, password_hash, description, image_url } = req.body;
-    if (!name || !email || !password_hash) {
-        return res.status(400).json({ error: "name, email and password_hash are required" });
+    const { name, email, description } = req.body;
+    let { image_url } = req.body;
+    if (!name || !email) {
+        return res.status(400).json({ error: "name and email are required" });
     }
     try {
+        const auth0_id = req.auth.payload.sub;
+        const existing = await organizationModel.getOrganizationByAuth0Id(auth0_id);
+        if (existing) {
+            return res.status(409).json({ error: "An organization profile already exists for this account" });
+        }
+
+        if (req.file) {
+            image_url = await uploadImage(organizationContainerClient, req.file);
+        }
         const organization = await organizationModel.createOrganization({
             name,
             email,
-            password_hash,
+            auth0_id,
             description,
             image_url,
         });
@@ -61,16 +73,31 @@ export const getOrganizationById = async (req, res) => {
 };
 
 export const updateOrganization = async (req, res) => {
-    const { name, description, image_url } = req.body;
+    const { name, description } = req.body;
+    let { image_url } = req.body;
     try {
+        // requireOwnOrganization middleware already verified this org exists and is owned by the caller
+        const existing = req.organization;
+
+        if (req.file) {
+            image_url = await uploadImage(organizationContainerClient, req.file);
+        }
+
         const organization = await organizationModel.updateOrganization(req.params.id, {
             name,
             description,
             image_url,
         });
-        if (!organization) {
-            return res.status(404).json({ error: "Organization not found" });
+
+        //once update is sucessfull, delete the old image from azure blob storage.
+        if (req.file && existing.image_url) {
+            try {
+                await deleteImage(organizationContainerClient, existing.image_url);
+            } catch (cleanupError) {
+                console.error("Failed to delete old organization image:", cleanupError);
+            }
         }
+
         res.json(organization);
     } catch (error) {
         if (error.code === "23505") {
@@ -91,6 +118,19 @@ export const incrementFollowersCount = async (req, res) => {
     } catch (error) {
         console.error("Error incrementing followers count:", error);
         res.status(500).json({ error: "Failed to increment followers count" });
+    }
+};
+
+export const decrementFollowersCount = async (req, res) => {
+    try {
+        const organization = await organizationModel.decrementFollowersCount(req.params.id);
+        if (!organization) {
+            return res.status(404).json({ error: "Organization not found" });
+        }
+        res.json(organization);
+    } catch (error) {
+        console.error("Error decrementing followers count:", error);
+        res.status(500).json({ error: "Failed to decrement followers count" });
     }
 };
 

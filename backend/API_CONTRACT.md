@@ -3,24 +3,56 @@
 REST contract for the Organizations, Events, and Tags resources. Built on Express 5 + node-postgres against the schema in `backend/migrations` — share this with anyone wiring up fetch calls on the frontend.
 
 - **Base URL:** `http://localhost:8000/api`
-- **Format:** `application/json`
-- **Auth:** none yet
-- **Contract version:** v0.1 — 2026-09-04
+- **Format:** `application/json`, except image uploads (see below)
+- **Auth:** Auth0. An organization *is* an Auth0 user — log in with the Auth0 SPA SDK, request an access token for this API's audience, and send it as `Authorization: Bearer <token>` on every write request.
+- **Contract version:** v0.4 — 2026-09-04
 
 ## Conventions
 
 | | |
 |---|---|
-| **Requests** | JSON bodies only. Send `Content-Type: application/json` on every `POST`/`PUT`. |
+| **Requests** | JSON bodies for everything except uploads. Send `Content-Type: application/json` on every `POST`/`PUT` unless you're attaching an image. |
+| **Image uploads** | `POST`/`PUT` on `organizations` and `events` also accept `multipart/form-data` with a single file field named `image` (max 5MB, image mimetypes only). Send the other fields as regular form fields in the same request. When a file is attached, it replaces any `image_url` sent alongside it. Files are stored in Azure Blob Storage; the response's `image_url` is a public blob URL, directly loadable with a plain `<img src="...">` — no auth or SAS token needed. |
 | **Errors** | Every non-2xx response is `{ "error": "message" }` — no exceptions. |
 | **Timestamps** | ISO 8601 with timezone, e.g. `2026-09-04T19:23:18.034Z`. |
 | **IDs** | All resource ids are integers, serialized as JSON numbers. |
 
-**Status codes used:** `200` OK · `201` Created · `204` No Content · `400` Bad request/validation · `404` Not found · `409` Conflict (unique constraint) · `500` Server error
+**Status codes used:** `200` OK · `201` Created · `204` No Content · `400` Bad request/validation · `401` Missing/invalid token · `403` Forbidden (no org profile yet, or not the owner) · `404` Not found · `409` Conflict (unique constraint) · `500` Server error
 
-> **Not implemented yet — don't build against these**
-> - No auth/session layer. Every endpoint below is currently open.
-> - `password_hash` sent to `POST /organizations` is stored as-is — hashing happens on the backend before this contract is final, not on the client. #backend-TODO: encryption
+## Auth
+
+Organizations no longer have their own password — Auth0 is the only way to authenticate as one.
+
+## Clone or download the sample app for reference
+Clone the sample application with the following command.
+
+```bash
+git clone -b quickstart/login https://github.com/auth0-samples/auth0-javascript-samples --depth 1 auth0-javascript-samples
+
+cd auth0-javascript-samples
+```
+
+- **Domain:** `annhasna.ca.auth0.com`
+- **Audience:** `https://thunderboard-api` — pass this as `authorizationParams: { audience: 'https://thunderboard-api' }` in `createAuth0Client` (or on `loginWithRedirect`/`getTokenSilently`). Without it, Auth0 issues an opaque token this backend can't verify — it has to be a JWT access token scoped to this audience.
+- **Client ID:** see `/index.html` for the current one, or the Auth0 dashboard (Applications → your SPA app).
+- **Reference implementation:** `auth0-poc/` in this repo is a minimal working SPA login flow (signup/login/logout/profile) against this same tenant — copy its `createAuth0Client` call and add the `audience` param above.
+
+1. **Log in** via the Auth0 SPA SDK (`loginWithRedirect` / `getTokenSilently`) with the `audience` above, so you get back a JWT access token (not an opaque one).
+2. **First time only — create your organization profile:** `POST /api/organizations` with the token attached. This links the Auth0 account (its `sub` claim) to a new organization row. One Auth0 account → at most one organization; a second `POST` from the same account is a `409`.
+3. **Every write after that** — `PUT`/`DELETE` on your own organization, and creating/editing/deleting your own events — needs `Authorization: Bearer <token>` from that same Auth0 account. `organizer_id` for events is *always* derived from the token, never from the request body — you cannot create or edit another organization's events.
+4. All `GET` endpoints stay public — no token needed to browse orgs/events/tags.
+
+| Endpoint | Auth required |
+|---|---|
+| `POST /api/organizations` | Bearer token (any authenticated Auth0 user without an existing org) |
+| `PUT /api/organizations/:id`, `DELETE /api/organizations/:id` | Bearer token, must own `:id` |
+| `POST /api/organizations/:id/follow`, `POST /api/organizations/:id/unfollow` | none |
+| `POST /api/events` | Bearer token (must have an organization profile) |
+| `PUT /api/events/:id`, `DELETE /api/events/:id` | Bearer token, must own the event |
+| `POST /api/events/:id/tags`, `DELETE /api/events/:id/tags/:tag_id` | Bearer token, must own the event |
+| Everything else (all `GET`s, `/api/tags/*`) | none |
+
+**401** (missing/invalid/expired token) and **403** (valid token, wrong owner, or no org profile yet) both use the standard `{ "error": "message" }` shape.
 
 ---
 
@@ -28,21 +60,22 @@ REST contract for the Organizations, Events, and Tags resources. Built on Expres
 
 Base path: `/api/organizations`
 
-Clubs and student orgs that host events (e.g. AMS clubs, faculty societies). `password_hash` is write-only — it is never present in a response.
+Clubs and student orgs that host events (e.g. AMS clubs, faculty societies). Each organization is tied 1:1 to an Auth0 account.
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/` | Create an organization |
+| `POST` | `/` | Create an organization (requires auth, see [Auth](#auth)) |
 | `GET` | `/` | List all organizations |
 | `GET` | `/search?name=` | Search by name (partial, case-insensitive) |
 | `GET` | `/:id` | Get one organization |
 | `PUT` | `/:id` | Update name / description / image_url |
 | `POST` | `/:id/follow` | Increment follower count by 1 |
+| `POST` | `/:id/unfollow` | Decrement follower count by 1 (floored at 0) |
 | `DELETE` | `/:id` | Delete an organization |
 
 ### `POST /api/organizations`
 
-Create a new organization.
+Create a new organization for the authenticated Auth0 account. Requires `Authorization: Bearer <token>` (see [Auth](#auth)).
 
 Request body:
 
@@ -50,7 +83,6 @@ Request body:
 {
   "name": "Engineering Undergraduate Society",
   "email": "eus@ubc.ca",
-  "password_hash": "...",
   "description": "Faculty society for Applied Science",  // optional
   "image_url": "https://.../eus-logo.png"                // optional
 }
@@ -60,9 +92,8 @@ Request body:
 |---|---|
 | `name` | **required** · unique |
 | `email` | **required** · unique |
-| `password_hash` | **required** |
 | `description` | optional |
-| `image_url` | optional |
+| `image_url` | optional · ignored if an `image` file is attached instead (see Conventions) |
 
 **201 Created**
 ```json
@@ -77,10 +108,11 @@ Request body:
 }
 ```
 
-**400 / 409**
+**400 / 401 / 409**
 ```json
-{ "error": "name, email and password_hash are required" }
+{ "error": "name and email are required" }
 { "error": "An organization with that name or email already exists" }
+{ "error": "An organization profile already exists for this account" }
 ```
 
 ### `GET /api/organizations`
@@ -122,19 +154,25 @@ Fetch one organization by id.
 
 ### `PUT /api/organizations/:id`
 
-Partial update — omitted fields are left unchanged. Cannot change `email` here.
+Partial update — omitted fields are left unchanged. Cannot change `email` here. Requires `Authorization: Bearer <token>` from the account that owns this organization.
 
 Request body (all optional):
 ```json
 { "name": "...", "description": "...", "image_url": "..." }
 ```
 
+As with create, you may send an `image` file (multipart) instead of `image_url`.
+
 **200 OK** → updated organization object
+**401** → `{ "error": "..." }` (missing/invalid token)
+**403** → `{ "error": "You do not own this organization" }`
 **404 / 409** → `{ "error": "Organization not found" }`
 
 ### `POST /api/organizations/:id/follow`
 
 Increments `followers_count` by 1, atomically at the DB level. No request body. **Not idempotent** — calling it twice adds 2.
+
+Following/unfollowing is guest-driven — there's no server-side record of *who* follows an org, only the aggregate count. The frontend is responsible for tracking which orgs a given browser has followed (e.g. in `localStorage`) and calling `follow`/`unfollow` accordingly.
 
 **200 OK**
 ```json
@@ -146,11 +184,27 @@ Increments `followers_count` by 1, atomically at the DB level. No request body. 
 { "error": "Organization not found" }
 ```
 
+### `POST /api/organizations/:id/unfollow`
+
+Decrements `followers_count` by 1, atomically at the DB level, floored at 0 (never goes negative). No request body. **Not idempotent** below the floor — calling it twice on a count of 1 leaves it at 0, not -1.
+
+**200 OK**
+```json
+{ "id": 1, "name": "ThunderBoard", "...": "...", "followers_count": 0 }
+```
+
+**404 Not Found**
+```json
+{ "error": "Organization not found" }
+```
+
 ### `DELETE /api/organizations/:id`
 
-Deletes the organization. Cascades to its events (and their tag links) via the FK.
+Deletes the organization. Cascades to its events (and their tag links) via the FK. Requires `Authorization: Bearer <token>` from the account that owns this organization.
 
 **200 OK** → deleted organization object
+**401** → `{ "error": "..." }` (missing/invalid token)
+**403** → `{ "error": "You do not own this organization" }`
 **404 Not Found** → `{ "error": "Organization not found" }`
 
 ---
@@ -163,7 +217,7 @@ Events belong to one organizer and carry zero or more tags via the `event_tags` 
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/` | Create an event |
+| `POST` | `/` | Create an event under your organization |
 | `GET` | `/` | List all events (by start_date) |
 | `GET` | `/search?title=` | Search by title (partial, case-insensitive) |
 | `GET` | `/tags?tag_ids=1,2` | Events matching *any* of the given tag ids |
@@ -177,12 +231,11 @@ Events belong to one organizer and carry zero or more tags via the `event_tags` 
 
 ### `POST /api/events`
 
-Create an event under an organizer.
+Create an event under the authenticated organization. Requires `Authorization: Bearer <token>` from an account that already has an organization profile (see [Auth](#auth)).
 
 Request body:
 ```jsonc
 {
-  "organizer_id": 3,
   "title": "Design Team Showcase",
   "description": "...",          // optional
   "start_date": "2026-09-20",
@@ -196,18 +249,20 @@ Request body:
 
 | Field | Notes |
 |---|---|
-| `organizer_id` | **required** · must reference an existing organization |
 | `title` | **required** |
 | `start_date` | **required** |
 | `status` | optional · one of `draft` / `published` / `expired` (DB-enforced check constraint) · defaults to `published` |
+| `image_url` | optional · ignored if an `image` file is attached instead (see Conventions) |
+
+`organizer_id` is **not** a request field — it's always the organization tied to your token. Sending one in the body is silently ignored.
 
 **201 Created** → created event object
 
-**400**
+**400 / 401 / 403**
 ```json
-{ "error": "organizer_id, title and start_date are required" }
-{ "error": "organizer_id does not reference an existing organization" }
+{ "error": "title and start_date are required" }
 { "error": "status must be one of: draft, published, expired" }
+{ "error": "No organization profile exists for this account yet" }
 ```
 
 ### `GET /api/events`
@@ -258,24 +313,28 @@ Fetch one event by id.
 
 ### `PUT /api/events/:id`
 
-Partial update. Omitted fields are unchanged; `updated_at` is set automatically. `organizer_id` cannot be changed here.
+Partial update. Omitted fields are unchanged; `updated_at` is set automatically. `organizer_id` cannot be changed here. Requires `Authorization: Bearer <token>` from the event's own organizer.
 
 Request body (all optional):
 ```json
 { "title": "...", "description": "...", "start_date": "...", "start_time": "...", "end_time": "...", "location": "...", "image_url": "...", "status": "..." }
 ```
 
-`status`, if included, must be one of `draft` / `published` / `expired` (DB-enforced check constraint).
+`status`, if included, must be one of `draft` / `published` / `expired` (DB-enforced check constraint). As with create, you may send an `image` file (multipart) instead of `image_url`.
 
 **200 OK** → updated event object
 **400** → `{ "error": "status must be one of: draft, published, expired" }`
+**401** → `{ "error": "..." }` (missing/invalid token)
+**403** → `{ "error": "You do not own this event" }`
 **404 Not Found** → `{ "error": "Event not found" }`
 
 ### `DELETE /api/events/:id`
 
-Deletes the event and its `event_tags` rows (cascade).
+Deletes the event and its `event_tags` rows (cascade). Requires `Authorization: Bearer <token>` from the event's own organizer.
 
 **200 OK** → deleted event object
+**401** → `{ "error": "..." }` (missing/invalid token)
+**403** → `{ "error": "You do not own this event" }`
 **404 Not Found** → `{ "error": "Event not found" }`
 
 ### `GET /api/events/:id/tags`
@@ -289,7 +348,7 @@ Tags currently attached to this event.
 
 ### `POST /api/events/:id/tags`
 
-Attach a tag to an event. Idempotent — attaching the same tag twice is a no-op.
+Attach a tag to an event. Idempotent — attaching the same tag twice is a no-op. Requires `Authorization: Bearer <token>` from the event's own organizer.
 
 Request body:
 ```json
@@ -303,12 +362,16 @@ Request body:
 { "error": "tag_id is required" }
 { "error": "event or tag does not exist" }
 ```
+**401** → `{ "error": "..." }` (missing/invalid token)
+**403** → `{ "error": "You do not own this event" }`
 
 ### `DELETE /api/events/:id/tags/:tag_id`
 
-Detach a tag from an event.
+Detach a tag from an event. Requires `Authorization: Bearer <token>` from the event's own organizer.
 
 **204 No Content**
+**401** → `{ "error": "..." }` (missing/invalid token)
+**403** → `{ "error": "You do not own this event" }`
 
 ---
 

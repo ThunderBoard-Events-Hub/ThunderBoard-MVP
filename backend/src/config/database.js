@@ -6,7 +6,7 @@ dotenv.config();
 const { Pool } = pg;
 
 export const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: process.env.AZURE_DATABASE_URL,
     // Local Postgres doesn't speak SSL; only require it in production (e.g. Heroku)
     ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
 });
