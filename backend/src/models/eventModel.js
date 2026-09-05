@@ -20,6 +20,26 @@ export const createEvent = async ({
     return rows[0];
 };
 
+// Flips 'published' events to 'expired' once they're over: end_time on start_date
+// if given, otherwise the end of start_date itself (an event with no end_time is
+// treated as lasting through the rest of that day). Draft events are left alone —
+// only a published event can expire. Returns the ids that were just flipped.
+export const expireOverdueEvents = async () => {
+    const { rows } = await pool.query(
+        `UPDATE events
+         SET status = 'expired', updated_at = CURRENT_TIMESTAMP
+         WHERE status = 'published'
+           AND (
+             CASE
+               WHEN end_time IS NOT NULL THEN (start_date + end_time) < now()
+               ELSE (start_date + INTERVAL '1 day') < now()
+             END
+           )
+         RETURNING id`
+    );
+    return rows.map((row) => row.id);
+};
+
 // --- CRUD operations for events ---
 
 export const getAllEvents = async () => {

@@ -4,8 +4,8 @@ REST contract for the Organizations, Events, and Tags resources. Built on Expres
 
 - **Base URL:** `http://localhost:8000/api`
 - **Format:** `application/json`, except image uploads (see below)
-- **Auth:** Auth0. An organization *is* an Auth0 user — log in with the Auth0 SPA SDK, request an access token for this API's audience, and send it as `Authorization: Bearer <token>` on every write request.
-- **Contract version:** v0.4 — 2026-09-04
+- **Auth:** Auth0. An organization *is* an Auth0 user — log in with the Auth0 SPA SDK, request an access token for this API's audience, and send it as `Authorization: Bearer <token>` on every write request. A small fixed set of admin accounts (see [Auth](#auth)) can review organization signups and manage tags.
+- **Contract version:** v0.7 — 2026-09-05
 
 ## Conventions
 
@@ -38,21 +38,36 @@ cd auth0-javascript-samples
 - **Reference implementation:** `auth0-poc/` in this repo is a minimal working SPA login flow (signup/login/logout/profile) against this same tenant — copy its `createAuth0Client` call and add the `audience` param above.
 
 1. **Log in** via the Auth0 SPA SDK (`loginWithRedirect` / `getTokenSilently`) with the `audience` above, so you get back a JWT access token (not an opaque one).
-2. **First time only — create your organization profile:** `POST /api/organizations` with the token attached. This links the Auth0 account (its `sub` claim) to a new organization row. One Auth0 account → at most one organization; a second `POST` from the same account is a `409`.
-3. **Every write after that** — `PUT`/`DELETE` on your own organization, and creating/editing/deleting your own events — needs `Authorization: Bearer <token>` from that same Auth0 account. `organizer_id` for events is *always* derived from the token, never from the request body — you cannot create or edit another organization's events.
-4. All `GET` endpoints stay public — no token needed to browse orgs/events/tags.
+2. **First time only — create your organization profile:** `POST /api/organizations` with the token attached. This links the Auth0 account (its `sub` claim) to a new organization row, in `pending` status. One Auth0 account → at most one organization; a second `POST` from the same account is a `409`.
+3. **Wait for admin approval.** A human admin manually verifies the org is a real, UBC-affiliated club before it goes live (see [Organization approval](#organization-approval) below). Until then, the org can view/edit its own profile (`GET/PUT /api/organizations/me`... i.e. `GET /api/organizations/me` then `PUT /api/organizations/:id`) but **cannot create events**, and doesn't show up in any public listing.
+4. **Once approved**, every write — `PUT`/`DELETE` on your own organization, and creating/editing/deleting your own events — needs `Authorization: Bearer <token>` from that same Auth0 account. `organizer_id` for events is *always* derived from the token, never from the request body — you cannot create or edit another organization's events.
+5. All `GET` endpoints stay public — no token needed to browse orgs/events/tags.
 
 | Endpoint | Auth required |
 |---|---|
 | `POST /api/organizations` | Bearer token (any authenticated Auth0 user without an existing org) |
-| `PUT /api/organizations/:id`, `DELETE /api/organizations/:id` | Bearer token, must own `:id` |
+| `GET /api/organizations/me` | Bearer token (any authenticated org, any approval status) |
+| `PUT /api/organizations/:id`, `DELETE /api/organizations/:id` | Bearer token, must own `:id` (allowed at any approval status) |
 | `POST /api/organizations/:id/follow`, `POST /api/organizations/:id/unfollow` | none |
-| `POST /api/events` | Bearer token (must have an organization profile) |
+| `GET /api/organizations/pending`, `POST /api/organizations/:id/approve`, `POST /api/organizations/:id/decline` | Bearer token, admin only |
+| `POST /api/events`, and creating/editing/deleting an event's tags | Bearer token, must have an **approved** organization profile |
 | `PUT /api/events/:id`, `DELETE /api/events/:id` | Bearer token, must own the event |
-| `POST /api/events/:id/tags`, `DELETE /api/events/:id/tags/:tag_id` | Bearer token, must own the event |
-| Everything else (all `GET`s, `/api/tags/*`) | none |
+| `POST /api/tags`, `DELETE /api/tags/:id` | Bearer token, admin only |
+| `GET /api/admin/me` | Bearer token (any authenticated account — answers `false`, not `403`, for a non-admin) |
+| Everything else (all `GET`s except `/organizations/me`, `/organizations/pending`, `/admin/me`) | none |
 
-**401** (missing/invalid/expired token) and **403** (valid token, wrong owner, or no org profile yet) both use the standard `{ "error": "message" }` shape.
+**401** (missing/invalid/expired token) and **403** (valid token, wrong owner, no org profile yet, org not yet approved, or not an admin) both use the standard `{ "error": "message" }` shape.
+
+### Organization approval
+
+Organizations don't go live the moment they sign up — a human admin checks each one is a real, UBC-affiliated club first.
+
+- **`approval_status`** is one of `pending` (default on signup) / `approved` / `rejected`. It's never shown on public endpoints (`GET /api/organizations`, `/search`, `/:id`) — those only ever return `approved` orgs, full stop; a pending or rejected org simply isn't in the list and 404s if looked up by id directly. The owning account can always see its own status via `GET /api/organizations/me`.
+- **Admins** are identified by a fixed allowlist of Auth0 account ids (not a role visible anywhere in this API) — ask backend if you need to know who currently has admin access.
+- `GET /api/admin/me` — for deciding whether to show admin-only UI (e.g. a nav link) after login. Unlike every other admin endpoint, it never `403`s: any authenticated caller gets back `{ "isAdmin": true }` or `{ "isAdmin": false }`. Only `401` (missing/invalid token) is an error case here.
+- `GET /api/organizations/pending` lists every org awaiting a decision (includes `approval_status` in the response, unlike public listings).
+- `POST /api/organizations/:id/approve` / `POST /api/organizations/:id/decline` — both **404** if `:id` doesn't exist or isn't currently `pending` (i.e. a decision already made can't be redone through this endpoint).
+- A `rejected` org can still log in and see/edit its own profile via `/me`, but stays invisible publicly and still can't create events — there's currently no "resubmit for review" flow; a declined org would need a human to flip it back to `pending` at the DB level.
 
 ---
 
@@ -65,12 +80,16 @@ Clubs and student orgs that host events (e.g. AMS clubs, faculty societies). Eac
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/` | Create an organization (requires auth, see [Auth](#auth)) |
-| `GET` | `/` | List all organizations |
-| `GET` | `/search?name=` | Search by name (partial, case-insensitive) |
-| `GET` | `/:id` | Get one organization |
+| `GET` | `/` | List all **approved** organizations |
+| `GET` | `/search?name=` | Search by name among **approved** organizations |
+| `GET` | `/me` | The authenticated account's own org, any approval status |
+| `GET` | `/pending` | Admin only — orgs awaiting review |
+| `GET` | `/:id` | Get one organization (**approved** only) |
 | `PUT` | `/:id` | Update name / description / image_url |
 | `POST` | `/:id/follow` | Increment follower count by 1 |
 | `POST` | `/:id/unfollow` | Decrement follower count by 1 (floored at 0) |
+| `POST` | `/:id/approve` | Admin only — approve a pending org |
+| `POST` | `/:id/decline` | Admin only — decline a pending org |
 | `DELETE` | `/:id` | Delete an organization |
 
 ### `POST /api/organizations`
@@ -91,9 +110,9 @@ Request body:
 | Field | Notes |
 |---|---|
 | `name` | **required** · unique |
-| `email` | **required** · unique |
+| `email` | **required** · unique · must look like a real email address (`x@y.z` shape — not verified as deliverable) |
 | `description` | optional |
-| `image_url` | optional · ignored if an `image` file is attached instead (see Conventions) |
+| `image_url` | optional · must be a valid `http(s)` URL if sent as a string · ignored if an `image` file is attached instead (see Conventions) |
 
 **201 Created**
 ```json
@@ -111,13 +130,17 @@ Request body:
 **400 / 401 / 409**
 ```json
 { "error": "name and email are required" }
+{ "error": "email must be a valid email address" }
+{ "error": "image_url must be a valid http(s) URL" }
 { "error": "An organization with that name or email already exists" }
 { "error": "An organization profile already exists for this account" }
 ```
 
+The created org starts in `pending` — it won't appear in `GET /`, `/search`, or `GET /:id` until an admin approves it (see [Organization approval](#organization-approval)). Use `GET /api/organizations/me` to check on it in the meantime.
+
 ### `GET /api/organizations`
 
-List every organization.
+List every **approved** organization.
 
 **200 OK**
 ```json
@@ -129,7 +152,7 @@ List every organization.
 
 ### `GET /api/organizations/search?name=`
 
-Case-insensitive partial match on `name` (used for the org search bar).
+Case-insensitive partial match on `name` among **approved** organizations (used for the org search bar).
 
 | Param | Notes |
 |---|---|
@@ -138,16 +161,36 @@ Case-insensitive partial match on `name` (used for the org search bar).
 **200 OK** → array of matching organizations
 **400** → `{ "error": "Query param 'name' is required" }`
 
+### `GET /api/organizations/me`
+
+The authenticated account's own organization, **regardless of `approval_status`** — the one place that field is ever returned. Use this to tell "no org yet" (404, so show the signup form) apart from "pending"/"rejected"/"approved" (200, so show the right status banner) without guessing from a `POST /` 409. Requires `Authorization: Bearer <token>`.
+
+**200 OK**
+```json
+{ "id": 3, "name": "...", "email": "...", "description": null, "image_url": null, "followers_count": 0, "created_at": "...", "approval_status": "pending" }
+```
+
+**401** → `{ "error": "..." }` (missing/invalid token)
+**404 Not Found** → `{ "error": "No organization profile exists for this account yet" }`
+
+### `GET /api/organizations/pending`
+
+Admin only. Every organization currently awaiting a decision, oldest first — includes `approval_status` (always `"pending"` here) unlike the public listings.
+
+**200 OK** → array of organization objects
+**401** → `{ "error": "..." }` (missing/invalid token)
+**403** → `{ "error": "Admin access required" }`
+
 ### `GET /api/organizations/:id`
 
-Fetch one organization by id.
+Fetch one **approved** organization by id.
 
 **200 OK**
 ```json
 { "id": 1, "name": "ThunderBoard", "email": "...", "description": null, "image_url": null, "followers_count": 0, "created_at": "..." }
 ```
 
-**404 Not Found**
+**404 Not Found** — also returned for a real id that exists but isn't approved yet
 ```json
 { "error": "Organization not found" }
 ```
@@ -161,9 +204,10 @@ Request body (all optional):
 { "name": "...", "description": "...", "image_url": "..." }
 ```
 
-As with create, you may send an `image` file (multipart) instead of `image_url`.
+As with create, you may send an `image` file (multipart) instead of `image_url` — if sent as a string, `image_url` must be a valid `http(s)` URL.
 
 **200 OK** → updated organization object
+**400** → `{ "error": "image_url must be a valid http(s) URL" }`
 **401** → `{ "error": "..." }` (missing/invalid token)
 **403** → `{ "error": "You do not own this organization" }`
 **404 / 409** → `{ "error": "Organization not found" }`
@@ -198,6 +242,24 @@ Decrements `followers_count` by 1, atomically at the DB level, floored at 0 (nev
 { "error": "Organization not found" }
 ```
 
+### `POST /api/organizations/:id/approve`
+
+Admin only. Marks a pending organization `approved`, making it visible on all public endpoints. No request body.
+
+**200 OK** → the organization, including `approval_status: "approved"`
+**401** → `{ "error": "..." }` (missing/invalid token)
+**403** → `{ "error": "Admin access required" }`
+**404 Not Found** → `{ "error": "Organization not found or not pending review" }` (also returned if `:id` was already approved/declined)
+
+### `POST /api/organizations/:id/decline`
+
+Admin only. Marks a pending organization `rejected`. No request body, no reason field. There's no undo endpoint — a declined org would need to be reset at the database level to go through review again.
+
+**200 OK** → the organization, including `approval_status: "rejected"`
+**401** → `{ "error": "..." }` (missing/invalid token)
+**403** → `{ "error": "Admin access required" }`
+**404 Not Found** → `{ "error": "Organization not found or not pending review" }`
+
 ### `DELETE /api/organizations/:id`
 
 Deletes the organization. Cascades to its events (and their tag links) via the FK. Requires `Authorization: Bearer <token>` from the account that owns this organization.
@@ -215,6 +277,8 @@ Base path: `/api/events`
 
 Events belong to one organizer and carry zero or more tags via the `event_tags` join table.
 
+**Automatic expiry:** a backend job sweeps every 5 minutes and flips any `published` event to `expired` once it's over — `start_date + end_time` if `end_time` is set, otherwise the end of `start_date` itself (an event with no `end_time` is treated as lasting through the rest of that day). `draft` events are left alone; only `published` ever auto-expires. This means `status` can change on its own between requests — don't assume a `published` event you fetched a while ago still is.
+
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/` | Create an event under your organization |
@@ -231,7 +295,7 @@ Events belong to one organizer and carry zero or more tags via the `event_tags` 
 
 ### `POST /api/events`
 
-Create an event under the authenticated organization. Requires `Authorization: Bearer <token>` from an account that already has an organization profile (see [Auth](#auth)).
+Create an event under the authenticated organization. Requires `Authorization: Bearer <token>` from an account that already has an **approved** organization profile (see [Auth](#auth)) — a pending or rejected org gets a `403` here even though it can already log in and edit its own profile.
 
 Request body:
 ```jsonc
@@ -250,9 +314,10 @@ Request body:
 | Field | Notes |
 |---|---|
 | `title` | **required** |
-| `start_date` | **required** |
+| `start_date` | **required** · `YYYY-MM-DD`, must be a real calendar date (`2026-02-30` is rejected, not silently rolled over to March) |
+| `start_time`, `end_time` | optional · `HH:MM` or `HH:MM:SS`, 24-hour |
 | `status` | optional · one of `draft` / `published` / `expired` (DB-enforced check constraint) · defaults to `published` |
-| `image_url` | optional · ignored if an `image` file is attached instead (see Conventions) |
+| `image_url` | optional · must be a valid `http(s)` URL if sent as a string · ignored if an `image` file is attached instead (see Conventions) |
 
 `organizer_id` is **not** a request field — it's always the organization tied to your token. Sending one in the body is silently ignored.
 
@@ -261,8 +326,13 @@ Request body:
 **400 / 401 / 403**
 ```json
 { "error": "title and start_date are required" }
+{ "error": "start_date must be a valid date in YYYY-MM-DD format" }
+{ "error": "start_time must be a valid time in HH:MM or HH:MM:SS format" }
+{ "error": "end_time must be a valid time in HH:MM or HH:MM:SS format" }
+{ "error": "image_url must be a valid http(s) URL" }
 { "error": "status must be one of: draft, published, expired" }
 { "error": "No organization profile exists for this account yet" }
+{ "error": "Your organization is awaiting admin approval" }
 ```
 
 ### `GET /api/events`
@@ -320,10 +390,17 @@ Request body (all optional):
 { "title": "...", "description": "...", "start_date": "...", "start_time": "...", "end_time": "...", "location": "...", "image_url": "...", "status": "..." }
 ```
 
-`status`, if included, must be one of `draft` / `published` / `expired` (DB-enforced check constraint). As with create, you may send an `image` file (multipart) instead of `image_url`.
+`status`, if included, must be one of `draft` / `published` / `expired` (DB-enforced check constraint). `start_date`/`start_time`/`end_time`/`image_url`, if included, follow the same format rules as `POST /api/events` above. As with create, you may send an `image` file (multipart) instead of `image_url`.
 
 **200 OK** → updated event object
-**400** → `{ "error": "status must be one of: draft, published, expired" }`
+**400**
+```json
+{ "error": "start_date must be a valid date in YYYY-MM-DD format" }
+{ "error": "start_time must be a valid time in HH:MM or HH:MM:SS format" }
+{ "error": "end_time must be a valid time in HH:MM or HH:MM:SS format" }
+{ "error": "image_url must be a valid http(s) URL" }
+{ "error": "status must be one of: draft, published, expired" }
+```
 **401** → `{ "error": "..." }` (missing/invalid token)
 **403** → `{ "error": "You do not own this event" }`
 **404 Not Found** → `{ "error": "Event not found" }`
@@ -379,18 +456,18 @@ Detach a tag from an event. Requires `Authorization: Bearer <token>` from the ev
 
 Base path: `/api/tags`
 
-Flat, org-independent tag vocabulary (e.g. `Engineering`, `Socials`) attached to events via `event_tags`.
+Flat, org-independent tag vocabulary (e.g. `Engineering`, `Socials`) attached to events via `event_tags`. The vocabulary itself is curated by admins only — an organization can attach/detach *existing* tags to its own events (see `POST/DELETE /api/events/:id/tags` above) but can't create or delete tags.
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/` | Create a tag |
+| `POST` | `/` | Admin only — create a tag |
 | `GET` | `/` | List all tags |
 | `GET` | `/:id` | Get one tag |
-| `DELETE` | `/:id` | Delete a tag |
+| `DELETE` | `/:id` | Admin only — delete a tag |
 
 ### `POST /api/tags`
 
-Create a tag.
+Admin only. Create a tag. Requires `Authorization: Bearer <token>` from an admin account.
 
 Request body:
 ```json
@@ -402,9 +479,10 @@ Request body:
 { "id": 6, "name": "Networking" }
 ```
 
-**400 / 409**
+**400 / 401 / 403 / 409**
 ```json
 { "error": "name is required" }
+{ "error": "Admin access required" }
 { "error": "A tag with that name already exists" }
 ```
 
@@ -437,10 +515,38 @@ Fetch one tag by id.
 
 ### `DELETE /api/tags/:id`
 
-Deletes the tag and its `event_tags` links (cascade). Does not delete events.
+Admin only. Deletes the tag and its `event_tags` links (cascade). Does not delete events. Requires `Authorization: Bearer <token>` from an admin account.
 
 **200 OK** → deleted tag object
+**401** → `{ "error": "..." }` (missing/invalid token)
+**403** → `{ "error": "Admin access required" }`
 **404 Not Found** → `{ "error": "Tag not found" }`
+
+---
+
+## Admin
+
+Base path: `/api/admin`
+
+Not tied to organizations — a home for admin-only utilities that aren't about a specific org or event. Today, just the one "am I an admin" check.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/me` | Whether the authenticated account is an admin |
+
+### `GET /api/admin/me`
+
+For deciding whether to show admin-only UI after login (e.g. a nav link to an admin panel). Requires `Authorization: Bearer <token>` — but unlike `/pending`, `/:id/approve`, `/:id/decline`, and the tag-mutation endpoints, a non-admin caller still gets a normal `200`, not a `403`. The only error case is a missing/invalid token.
+
+**200 OK**
+```json
+{ "isAdmin": true }
+```
+```json
+{ "isAdmin": false }
+```
+
+**401** → `{ "error": "..." }` (missing/invalid token)
 
 ---
 

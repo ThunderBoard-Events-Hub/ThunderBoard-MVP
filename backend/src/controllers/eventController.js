@@ -1,12 +1,25 @@
 import * as eventModel from "../models/eventModel.js";
 import { eventsContainerClient } from "../config/storage.js";
 import { uploadImage, deleteImage } from "../services/imageUploadService.js";
+import { isValidDate, isValidTime, isValidUrl } from "../utils/validation.js";
 
 export const createEvent = async (req, res) => {
     const { title, description, start_date, start_time, end_time, location, status } = req.body;
     let { image_url } = req.body;
     if (!title || !start_date) {
         return res.status(400).json({ error: "title and start_date are required" });
+    }
+    if (!isValidDate(start_date)) {
+        return res.status(400).json({ error: "start_date must be a valid date in YYYY-MM-DD format" });
+    }
+    if (start_time && !isValidTime(start_time)) {
+        return res.status(400).json({ error: "start_time must be a valid time in HH:MM or HH:MM:SS format" });
+    }
+    if (end_time && !isValidTime(end_time)) {
+        return res.status(400).json({ error: "end_time must be a valid time in HH:MM or HH:MM:SS format" });
+    }
+    if (!req.file && image_url && !isValidUrl(image_url)) {
+        return res.status(400).json({ error: "image_url must be a valid http(s) URL" });
     }
 
     try {
@@ -109,6 +122,18 @@ export const getEventById = async (req, res) => {
 export const updateEvent = async (req, res) => {
     const { title, description, start_date, start_time, end_time, location, status } = req.body;
     let { image_url } = req.body;
+    if (start_date && !isValidDate(start_date)) {
+        return res.status(400).json({ error: "start_date must be a valid date in YYYY-MM-DD format" });
+    }
+    if (start_time && !isValidTime(start_time)) {
+        return res.status(400).json({ error: "start_time must be a valid time in HH:MM or HH:MM:SS format" });
+    }
+    if (end_time && !isValidTime(end_time)) {
+        return res.status(400).json({ error: "end_time must be a valid time in HH:MM or HH:MM:SS format" });
+    }
+    if (!req.file && image_url && !isValidUrl(image_url)) {
+        return res.status(400).json({ error: "image_url must be a valid http(s) URL" });
+    }
     try {
         // requireOwnEvent middleware already verified this event exists and is owned by the caller
         const existing = req.event;

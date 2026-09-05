@@ -14,6 +14,7 @@ const pngBuffer = Buffer.from(
 
 const unique = randomUUID();
 const orgSub = `auth0|${randomUUID()}`;
+const adminSub = `auth0|admin-${randomUUID()}`;
 let organizerId;
 let tagId;
 let createdEventId;
@@ -23,6 +24,7 @@ let createdEventId;
 // cascades mean that if you delete the organizer, all events associated with that organizer will also be deleted automatically, and any tags associated with those events will also be removed from the event_tags table. This ensures that there are no orphaned records left in the database after the tests run.
 before(async () => {
     mockAuth0();
+    process.env.ADMIN_AUTH0_IDS = adminSub;
 
     const orgRes = await request(app).post("/api/organizations").set("Authorization", bearer(orgSub)).send({
         name: `Event Test Org ${unique}`,
@@ -30,7 +32,9 @@ before(async () => {
     });
     organizerId = orgRes.body.id;
 
-    const tagRes = await request(app).post("/api/tags").send({ name: `Test Tag ${unique}` });
+    const tagRes = await request(app).post("/api/tags").set("Authorization", bearer(adminSub)).send({
+        name: `Test Tag ${unique}`,
+    });
     tagId = tagRes.body.id;
 });
 
@@ -45,6 +49,22 @@ test("POST /api/events 403s for an account with no organization profile", async 
         .set("Authorization", bearer(`auth0|${randomUUID()}`))
         .send({ title: "Orphan event", start_date: "2026-10-01" });
     assert.equal(res.status, 403);
+});
+
+test("POST /api/events 403s while the organizer is still pending admin approval", async () => {
+    const res = await request(app)
+        .post("/api/events")
+        .set("Authorization", bearer(orgSub))
+        .send({ title: "Too early event", start_date: "2026-10-01" });
+    assert.equal(res.status, 403);
+});
+
+test("admin approves the test organization so it can create events", async () => {
+    const res = await request(app)
+        .post(`/api/organizations/${organizerId}/approve`)
+        .set("Authorization", bearer(adminSub));
+    assert.equal(res.status, 200);
+    assert.equal(res.body.approval_status, "approved");
 });
 
 test("POST /api/events requires title and start_date", async () => {
@@ -63,6 +83,51 @@ test("POST /api/events rejects an invalid status", async () => {
     });
     assert.equal(res.status, 400);
     assert.match(res.body.error, /draft, published, expired/);
+});
+
+test("POST /api/events rejects a malformed start_date", async () => {
+    const res = await request(app)
+        .post("/api/events")
+        .set("Authorization", bearer(orgSub))
+        .send({ title: "Bad date event", start_date: "10/01/2026" });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /start_date/);
+});
+
+test("POST /api/events rejects a non-existent calendar date", async () => {
+    const res = await request(app)
+        .post("/api/events")
+        .set("Authorization", bearer(orgSub))
+        .send({ title: "Rollover date event", start_date: "2026-02-30" });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /start_date/);
+});
+
+test("POST /api/events rejects a malformed start_time", async () => {
+    const res = await request(app)
+        .post("/api/events")
+        .set("Authorization", bearer(orgSub))
+        .send({ title: "Bad start_time event", start_date: "2026-10-01", start_time: "9am" });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /start_time/);
+});
+
+test("POST /api/events rejects a malformed end_time", async () => {
+    const res = await request(app)
+        .post("/api/events")
+        .set("Authorization", bearer(orgSub))
+        .send({ title: "Bad end_time event", start_date: "2026-10-01", end_time: "25:00" });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /end_time/);
+});
+
+test("POST /api/events rejects a malformed image_url", async () => {
+    const res = await request(app)
+        .post("/api/events")
+        .set("Authorization", bearer(orgSub))
+        .send({ title: "Bad image_url event", start_date: "2026-10-01", image_url: "not a url" });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /valid http/);
 });
 
 test("POST /api/events creates an event under the authenticated organizer, defaulting to status 'published'", async () => {
@@ -205,6 +270,24 @@ test("PUT /api/events/:id updates fields", async () => {
     assert.ok(res.body.updated_at);
 });
 
+test("PUT /api/events/:id rejects a malformed start_date", async () => {
+    const res = await request(app)
+        .put(`/api/events/${createdEventId}`)
+        .set("Authorization", bearer(orgSub))
+        .send({ start_date: "not-a-date" });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /start_date/);
+});
+
+test("PUT /api/events/:id rejects a malformed image_url", async () => {
+    const res = await request(app)
+        .put(`/api/events/${createdEventId}`)
+        .set("Authorization", bearer(orgSub))
+        .send({ image_url: "not a url" });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /valid http/);
+});
+
 test("PUT /api/events/:id rejects an invalid status", async () => {
     const res = await request(app)
         .put(`/api/events/${createdEventId}`)
@@ -289,7 +372,7 @@ test("DELETE /api/events/:id deletes the event", async () => {
 });
 
 after(async () => {
-    await request(app).delete(`/api/tags/${tagId}`);
+    await request(app).delete(`/api/tags/${tagId}`).set("Authorization", bearer(adminSub));
     await request(app).delete(`/api/organizations/${organizerId}`).set("Authorization", bearer(orgSub));
     await pool.end();
 });

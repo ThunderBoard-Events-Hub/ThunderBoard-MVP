@@ -1,12 +1,19 @@
 import * as organizationModel from "../models/organizationModel.js";
 import { organizationContainerClient } from "../config/storage.js";
 import { uploadImage, deleteImage } from "../services/imageUploadService.js";
+import { isValidEmail, isValidUrl } from "../utils/validation.js";
 
 export const createOrganization = async (req, res) => {
     const { name, email, description } = req.body;
     let { image_url } = req.body;
     if (!name || !email) {
         return res.status(400).json({ error: "name and email are required" });
+    }
+    if (!isValidEmail(email)) {
+        return res.status(400).json({ error: "email must be a valid email address" });
+    }
+    if (!req.file && image_url && !isValidUrl(image_url)) {
+        return res.status(400).json({ error: "image_url must be a valid http(s) URL" });
     }
     try {
         const auth0_id = req.auth.payload.sub;
@@ -32,6 +39,23 @@ export const createOrganization = async (req, res) => {
         }
         console.error("Error creating organization:", error);
         res.status(500).json({ error: "Failed to create organization" });
+    }
+};
+
+// The authenticated account's own organization, regardless of approval_status —
+// lets the frontend tell "no profile yet" apart from "pending"/"rejected"/"approved"
+// without guessing from a 409 on POST /.
+export const getMyOrganization = async (req, res) => {
+    try {
+        const organization = await organizationModel.getOrganizationByAuth0Id(req.auth.payload.sub);
+        if (!organization) {
+            return res.status(404).json({ error: "No organization profile exists for this account yet" });
+        }
+        const { auth0_id, ...publicFields } = organization;
+        res.json(publicFields);
+    } catch (error) {
+        console.error("Error fetching own organization:", error);
+        res.status(500).json({ error: "Failed to fetch organization" });
     }
 };
 
@@ -75,6 +99,9 @@ export const getOrganizationById = async (req, res) => {
 export const updateOrganization = async (req, res) => {
     const { name, description } = req.body;
     let { image_url } = req.body;
+    if (!req.file && image_url && !isValidUrl(image_url)) {
+        return res.status(400).json({ error: "image_url must be a valid http(s) URL" });
+    }
     try {
         // requireOwnOrganization middleware already verified this org exists and is owned by the caller
         const existing = req.organization;
@@ -131,6 +158,44 @@ export const decrementFollowersCount = async (req, res) => {
     } catch (error) {
         console.error("Error decrementing followers count:", error);
         res.status(500).json({ error: "Failed to decrement followers count" });
+    }
+};
+
+// --- Admin-only: reviewing signups ---
+
+export const getPendingOrganizations = async (req, res) => {
+    try {
+        const organizations = await organizationModel.getPendingOrganizations();
+        res.json(organizations);
+    } catch (error) {
+        console.error("Error fetching pending organizations:", error);
+        res.status(500).json({ error: "Failed to fetch pending organizations" });
+    }
+};
+
+export const approveOrganization = async (req, res) => {
+    try {
+        const organization = await organizationModel.approveOrganization(req.params.id);
+        if (!organization) {
+            return res.status(404).json({ error: "Organization not found or not pending review" });
+        }
+        res.json(organization);
+    } catch (error) {
+        console.error("Error approving organization:", error);
+        res.status(500).json({ error: "Failed to approve organization" });
+    }
+};
+
+export const declineOrganization = async (req, res) => {
+    try {
+        const organization = await organizationModel.declineOrganization(req.params.id);
+        if (!organization) {
+            return res.status(404).json({ error: "Organization not found or not pending review" });
+        }
+        res.json(organization);
+    } catch (error) {
+        console.error("Error declining organization:", error);
+        res.status(500).json({ error: "Failed to decline organization" });
     }
 };
 

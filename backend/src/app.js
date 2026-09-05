@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import organizationRoutes from './routes/organizationRoutes.js';
 import eventRoutes from './routes/eventRoutes.js';
 import tagRoutes from './routes/tagRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 dotenv.config();
 
@@ -26,6 +27,7 @@ app.use(express.json());
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/tags', tagRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use((err, req, res, next) => {
     if (err.message === 'Not allowed by CORS') {

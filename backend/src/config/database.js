@@ -7,8 +7,11 @@ const { Pool } = pg;
 
 export const pool = new Pool({
     connectionString: process.env.AZURE_DATABASE_URL,
-    // Local Postgres doesn't speak SSL; only require it in production (e.g. Heroku)
-    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+    // Local Postgres doesn't speak SSL; only require it in production (e.g. Azure).
+    // rejectUnauthorized: true verifies the server's certificate against trusted CAs,
+    // matching sslmode=verify-full in AZURE_DATABASE_URL — without this, connections
+    // are encrypted but not verified, leaving them open to a man-in-the-middle.
+    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: true } : false,
 });
 
 const connectPG = async () => {

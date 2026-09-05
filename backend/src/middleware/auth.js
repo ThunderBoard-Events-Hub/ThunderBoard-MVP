@@ -14,12 +14,16 @@ export const checkJwt = auth({
 
 // Must run after checkJwt. Loads the organization owned by the authenticated
 // Auth0 user and attaches it as req.organization, or 403s if that Auth0 user
-// hasn't created an organization profile yet.
+// hasn't created an organization profile yet, or if it's still awaiting admin
+// review — a pending/rejected org can't create or manage events.
 export const attachOrganization = async (req, res, next) => {
     try {
         const organization = await organizationModel.getOrganizationByAuth0Id(req.auth.payload.sub);
         if (!organization) {
             return res.status(403).json({ error: "No organization profile exists for this account yet" });
+        }
+        if (organization.approval_status !== "approved") {
+            return res.status(403).json({ error: "Your organization is awaiting admin approval" });
         }
         req.organization = organization;
         next();
@@ -46,6 +50,25 @@ export const requireOwnOrganization = async (req, res, next) => {
         console.error("Error checking organization ownership:", error);
         res.status(500).json({ error: "Failed to authenticate organization" });
     }
+};
+
+// Checks the ADMIN_AUTH0_IDS allowlist (comma-separated sub values, see .env.example).
+// Read live from process.env on every call rather than cached at import time, so it
+// can't go stale and tests can set it per-case without reloading modules.
+export const isAdminSub = (sub) => {
+    const adminIds = (process.env.ADMIN_AUTH0_IDS || "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
+    return adminIds.includes(sub);
+};
+
+// Must run after checkJwt. 403s unless the caller's Auth0 account is an admin.
+export const requireAdmin = (req, res, next) => {
+    if (!isAdminSub(req.auth.payload.sub)) {
+        return res.status(403).json({ error: "Admin access required" });
+    }
+    next();
 };
 
 // Must run after checkJwt + attachOrganization. 404s if :id doesn't exist, 403s if

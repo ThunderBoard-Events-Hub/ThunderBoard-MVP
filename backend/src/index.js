@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import connectPG from './config/database.js';
 import app from './app.js';
+import { startEventLifecycleScheduler } from './services/eventLifecycleService.js';
 
 dotenv.config({
     path: './.env'
@@ -19,7 +20,9 @@ const startServer = async () => {
         app.listen(process.env.PORT || 8000, () => {
             console.log(`Server is running on port ${process.env.PORT}`);
         });
-        
+
+        startEventLifecycleScheduler();
+
 
     } catch (error) {
         console.error('Error starting server:', error);

@@ -7,8 +7,11 @@ import { pool } from "../src/config/database.js";
 import { organizationContainerClient } from "../src/config/storage.js";
 import { mockAuth0, bearer } from "./helpers/testAuth.js";
 
+const adminSub = `auth0|admin-${randomUUID()}`;
+
 before(() => {
     mockAuth0();
+    process.env.ADMIN_AUTH0_IDS = adminSub;
 });
 
 const pngBuffer = Buffer.from(
@@ -40,12 +43,31 @@ test("POST /api/organizations requires name and email", async () => {
     assert.match(res.body.error, /required/);
 });
 
-test("POST /api/organizations creates an organization and never returns auth0_id", async () => {
+test("POST /api/organizations rejects a malformed email", async () => {
+    const res = await request(app)
+        .post("/api/organizations")
+        .set("Authorization", bearer(orgSub))
+        .send({ name: "Bad Email Org", email: "not-an-email" });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /valid email/);
+});
+
+test("POST /api/organizations rejects a malformed image_url", async () => {
+    const res = await request(app)
+        .post("/api/organizations")
+        .set("Authorization", bearer(orgSub))
+        .send({ name: "Bad Image Org", email: `bad-image-${randomUUID()}@example.com`, image_url: "not a url" });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /valid http/);
+});
+
+test("POST /api/organizations creates an organization pending review, and never returns auth0_id or approval_status", async () => {
     const res = await request(app).post("/api/organizations").set("Authorization", bearer(orgSub)).send(testOrg);
     assert.equal(res.status, 201);
     assert.equal(res.body.name, testOrg.name);
     assert.equal(res.body.followers_count, 0);
     assert.equal("auth0_id" in res.body, false);
+    assert.equal("approval_status" in res.body, false);
     createdId = res.body.id;
 });
 
@@ -65,7 +87,74 @@ test("POST /api/organizations rejects a duplicate email under a different accoun
     assert.equal(res.status, 409);
 });
 
-test("GET /api/organizations includes the created organization", async () => {
+test("GET /api/organizations/me returns the caller's own org, pending status included, while awaiting review", async () => {
+    const res = await request(app).get("/api/organizations/me").set("Authorization", bearer(orgSub));
+    assert.equal(res.status, 200);
+    assert.equal(res.body.id, createdId);
+    assert.equal(res.body.approval_status, "pending");
+    assert.equal("auth0_id" in res.body, false);
+});
+
+test("GET /api/organizations/me 404s for an account with no organization yet", async () => {
+    const res = await request(app).get("/api/organizations/me").set("Authorization", bearer(`auth0|${randomUUID()}`));
+    assert.equal(res.status, 404);
+});
+
+test("GET /api/organizations does not include a still-pending organization", async () => {
+    const res = await request(app).get("/api/organizations");
+    assert.equal(res.status, 200);
+    assert.ok(!res.body.some((org) => org.id === createdId));
+});
+
+test("GET /api/organizations/:id 404s while the organization is pending review", async () => {
+    const res = await request(app).get(`/api/organizations/${createdId}`);
+    assert.equal(res.status, 404);
+});
+
+test("GET /api/organizations/:id 404s for a missing id", async () => {
+    const res = await request(app).get("/api/organizations/999999999");
+    assert.equal(res.status, 404);
+});
+
+test("GET /api/organizations/pending requires an Authorization header", async () => {
+    const res = await request(app).get("/api/organizations/pending");
+    assert.equal(res.status, 401);
+});
+
+test("GET /api/organizations/pending rejects a non-admin caller", async () => {
+    const res = await request(app).get("/api/organizations/pending").set("Authorization", bearer(orgSub));
+    assert.equal(res.status, 403);
+});
+
+test("GET /api/organizations/pending includes the pending organization for an admin", async () => {
+    const res = await request(app).get("/api/organizations/pending").set("Authorization", bearer(adminSub));
+    assert.equal(res.status, 200);
+    assert.ok(res.body.some((org) => org.id === createdId && org.approval_status === "pending"));
+});
+
+test("POST /api/organizations/:id/approve rejects a non-admin caller", async () => {
+    const res = await request(app)
+        .post(`/api/organizations/${createdId}/approve`)
+        .set("Authorization", bearer(orgSub));
+    assert.equal(res.status, 403);
+});
+
+test("POST /api/organizations/:id/approve approves a pending organization", async () => {
+    const res = await request(app)
+        .post(`/api/organizations/${createdId}/approve`)
+        .set("Authorization", bearer(adminSub));
+    assert.equal(res.status, 200);
+    assert.equal(res.body.approval_status, "approved");
+});
+
+test("POST /api/organizations/:id/approve 404s for an organization that's already been decided", async () => {
+    const res = await request(app)
+        .post(`/api/organizations/${createdId}/approve`)
+        .set("Authorization", bearer(adminSub));
+    assert.equal(res.status, 404);
+});
+
+test("GET /api/organizations includes the organization once approved", async () => {
     const res = await request(app).get("/api/organizations");
     assert.equal(res.status, 200);
     assert.ok(res.body.some((org) => org.id === createdId));
@@ -82,15 +171,10 @@ test("GET /api/organizations/search without name is a 400", async () => {
     assert.equal(res.status, 400);
 });
 
-test("GET /api/organizations/:id returns the organization", async () => {
+test("GET /api/organizations/:id returns the organization now that it's approved", async () => {
     const res = await request(app).get(`/api/organizations/${createdId}`);
     assert.equal(res.status, 200);
     assert.equal(res.body.id, createdId);
-});
-
-test("GET /api/organizations/:id 404s for a missing id", async () => {
-    const res = await request(app).get("/api/organizations/999999999");
-    assert.equal(res.status, 404);
 });
 
 test("PUT /api/organizations/:id requires an Authorization header", async () => {
@@ -113,6 +197,15 @@ test("PUT /api/organizations/:id updates fields", async () => {
         .send({ description: "Updated by automated tests" });
     assert.equal(res.status, 200);
     assert.equal(res.body.description, "Updated by automated tests");
+});
+
+test("PUT /api/organizations/:id rejects a malformed image_url", async () => {
+    const res = await request(app)
+        .put(`/api/organizations/${createdId}`)
+        .set("Authorization", bearer(orgSub))
+        .send({ image_url: "not a url" });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /valid http/);
 });
 
 test("POST /api/organizations/:id/follow increments followers_count", async () => {
@@ -144,6 +237,43 @@ test("POST /api/organizations/:id/unfollow floors followers_count at 0", async (
 test("POST /api/organizations/:id/unfollow 404s for a missing id", async () => {
     const res = await request(app).post("/api/organizations/999999999/unfollow");
     assert.equal(res.status, 404);
+});
+
+test("POST /api/organizations/:id/decline rejects a non-admin caller", async () => {
+    const sub = `auth0|${randomUUID()}`;
+    const created = await request(app)
+        .post("/api/organizations")
+        .set("Authorization", bearer(sub))
+        .send({ name: `Decline Test Org ${randomUUID()}`, email: `decline-${randomUUID()}@example.com` });
+
+    const res = await request(app).post(`/api/organizations/${created.body.id}/decline`).set("Authorization", bearer(sub));
+    assert.equal(res.status, 403);
+
+    await request(app).delete(`/api/organizations/${created.body.id}`).set("Authorization", bearer(sub));
+});
+
+test("POST /api/organizations/:id/decline declines a pending organization, which then stays invisible and can't be re-decided", async () => {
+    const sub = `auth0|${randomUUID()}`;
+    const created = await request(app)
+        .post("/api/organizations")
+        .set("Authorization", bearer(sub))
+        .send({ name: `Decline Test Org 2 ${randomUUID()}`, email: `decline2-${randomUUID()}@example.com` });
+
+    const declined = await request(app)
+        .post(`/api/organizations/${created.body.id}/decline`)
+        .set("Authorization", bearer(adminSub));
+    assert.equal(declined.status, 200);
+    assert.equal(declined.body.approval_status, "rejected");
+
+    const stillHidden = await request(app).get(`/api/organizations/${created.body.id}`);
+    assert.equal(stillHidden.status, 404);
+
+    const redecide = await request(app)
+        .post(`/api/organizations/${created.body.id}/approve`)
+        .set("Authorization", bearer(adminSub));
+    assert.equal(redecide.status, 404);
+
+    await request(app).delete(`/api/organizations/${created.body.id}`).set("Authorization", bearer(sub));
 });
 
 test("POST /api/organizations with an attached image uploads it to Azure and sets image_url", async () => {
@@ -213,6 +343,27 @@ test("PUT /api/organizations/:id without a new image leaves the existing image u
 
     await request(app).delete(`/api/organizations/${created.body.id}`).set("Authorization", bearer(sub));
     await organizationContainerClient.deleteBlob(blobName);
+});
+
+test("DELETE /api/organizations/:id cascades to its events", async () => {
+    const sub = `auth0|${randomUUID()}`;
+    const org = await request(app)
+        .post("/api/organizations")
+        .set("Authorization", bearer(sub))
+        .send({ name: `Cascade Test Org ${randomUUID()}`, email: `cascade-${randomUUID()}@example.com` });
+    await request(app).post(`/api/organizations/${org.body.id}/approve`).set("Authorization", bearer(adminSub));
+
+    const event = await request(app)
+        .post("/api/events")
+        .set("Authorization", bearer(sub))
+        .send({ title: `Cascade Test Event ${randomUUID()}`, start_date: "2026-10-01" });
+    assert.equal(event.status, 201);
+
+    const res = await request(app).delete(`/api/organizations/${org.body.id}`).set("Authorization", bearer(sub));
+    assert.equal(res.status, 200);
+
+    const eventAfter = await request(app).get(`/api/events/${event.body.id}`);
+    assert.equal(eventAfter.status, 404);
 });
 
 test("DELETE /api/organizations/:id requires ownership", async () => {
