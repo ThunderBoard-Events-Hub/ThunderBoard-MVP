@@ -26,9 +26,12 @@ jobs:
     - name: npm install, build, and test
       working-directory: backend
       env:
+      AZURE_DATABASE_URL: ${{ secrets.AZURE_DATABASE_URL }}
         AZURE_STORAGE_URL: ${{ secrets.AZURE_STORAGE_URL }}
         AZURE_STORAGE_EVENTS_CONTAINER_NAME: event-images
         AZURE_STORAGE_ORGANIZATION_CONTAINER_NAME: organization-logos
+        AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
+        AUTH0_AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
       run: |
         npm ci
         npm run build --if-present
