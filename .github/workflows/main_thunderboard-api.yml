@@ -26,7 +26,7 @@ jobs:
     - name: npm install, build, and test
       working-directory: backend
       env:
-      AZURE_DATABASE_URL: ${{ secrets.AZURE_DATABASE_URL }}
+        AZURE_DATABASE_URL: ${{ secrets.AZURE_DATABASE_URL }}
         AZURE_STORAGE_URL: ${{ secrets.AZURE_STORAGE_URL }}
         AZURE_STORAGE_EVENTS_CONTAINER_NAME: event-images
         AZURE_STORAGE_ORGANIZATION_CONTAINER_NAME: organization-logos
