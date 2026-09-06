@@ -16,10 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v2
 
     - name: Set up Node.js version
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v1
       with:
         node-version: '22.x'
 
@@ -31,7 +31,7 @@ jobs:
         npm run test --if-present
 
     - name: 'Deploy to Azure Web App'
-      uses: azure/webapps-deploy@v3
+      uses: azure/webapps-deploy@v2
       with:
         app-name: 'thunderboard-api'
         slot-name: 'production'
