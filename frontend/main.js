@@ -29,7 +29,15 @@ const Auth = (() => {
       },
     });
 
-    if (location.search.includes('code=') && location.search.includes('state=')) {
+    const params = new URLSearchParams(location.search);
+
+    if (params.has('error')) {
+      const description = params.get('error_description') || params.get('error');
+      history.replaceState({}, '', location.pathname);
+      throw new Error(description);
+    }
+
+    if (params.has('code') && params.has('state')) {
       try {
         await client.handleRedirectCallback();
       } catch (err) {
@@ -482,7 +490,10 @@ async function initAuth() {
   try {
     isAuthenticated = await Auth.init();
   } catch (err) {
-    console.error('Auth0 init failed:', err);
+    console.error('Auth0 login failed:', err);
+    Router.showView('login');
+    const banner = document.getElementById('loginBanner');
+    if (banner) banner.textContent = err.message;
     return;
   }
   if (!isAuthenticated) return;
