@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ThunderBoard — UBC Clubs</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- ============================================================
+         WELCOME
+    ============================================================= -->
+    <section class="view" data-view="welcome">
+      <div class="header">
+        <h1 class="title">Welcome to ThunderBoard.<br />Get started</h1>
+      </div>
+
+      <div class="btn-stack">
+        <button class="btn btn-primary" type="button" id="continueAsGuestBtn">Continue as guest</button>
+        <button class="btn btn-primary" type="button" data-choose-type="club">Organization account</button>
+      </div>
+
+      <div class="spacer"></div>
+
+      <p class="footer-note">
+        This independent student project is not affiliated<br />
+        with the University of British Columbia.
+      </p>
+    </section>
+
+    <!-- ============================================================
+         LOGIN
+    ============================================================= -->
+    <section class="view" data-view="login">
+      <div class="header">
+        <h1 class="title">Log in</h1>
+      </div>
+
+      <div id="loginBanner" class="form-banner" role="alert"></div>
+
+      <form id="loginForm" novalidate>
+        <div class="field">
+          <svg class="icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
+          <input name="email" type="email" placeholder="UBC email" required autocomplete="email" />
+        </div>
+
+        <div class="field">
+          <svg class="icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          <input id="loginPassword" name="password" type="password" placeholder="Password" required autocomplete="current-password" />
+          <button type="button" class="icon-right toggle-password" data-target="loginPassword" aria-label="Show password">
+            <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.3 20.3 0 0 1 5.06-5.94M9.9 4.24A10.4 10.4 0 0 1 12 4c7 0 11 8 11 8a20.4 20.4 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+
+        <a class="forgot-link" href="#">Forgot your password?</a>
+
+        <button type="submit" class="btn btn-primary">Sign in</button>
+      </form>
+
+      <a id="goToSignup" class="text-link-center" href="#">Create an account</a>
+
+      <div class="spacer"></div>
+
+      <p class="footer-note">
+        This independent student project is not affiliated<br />
+        with the University of British Columbia.
+      </p>
+    </section>
+
+    <!-- ============================================================
+         CREATE ACCOUNT (organizations only — guests need no account,
+         see the "Continue as guest" button on the welcome screen)
+    ============================================================= -->
+    <section class="view" data-view="create-account">
+
+      <!-- Club / organization variant -->
+      <div data-account-variant="club">
+        <div class="header tight">
+          <h1 class="title">Create account</h1>
+          <p class="subtitle">
+            Register with your group's official campus email for
+            <strong>instant activation</strong>. Non-official emails require
+            <strong>verification</strong> by our team.
+          </p>
+        </div>
+
+        <div class="form-banner"></div>
+
+        <form id="signupFormClub" novalidate>
+          <div class="field">
+            <svg class="icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
+            <input name="email" type="email" placeholder="yourgroup@ubc.ca" required autocomplete="email" />
+          </div>
+
+          <div class="field">
+            <svg class="icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+            <input id="pw1c" name="password" type="password" placeholder="Password" required autocomplete="new-password" />
+            <button type="button" class="icon-right toggle-password" data-target="pw1c" aria-label="Show password">
+              <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.3 20.3 0 0 1 5.06-5.94M9.9 4.24A10.4 10.4 0 0 1 12 4c7 0 11 8 11 8a20.4 20.4 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+
+          <div class="field">
+            <svg class="icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+            <input id="pw2c" name="confirmPassword" type="password" placeholder="Confirm password" required autocomplete="new-password" />
+            <button type="button" class="icon-right toggle-password" data-target="pw2c" aria-label="Show password">
+              <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.3 20.3 0 0 1 5.06-5.94M9.9 4.24A10.4 10.4 0 0 1 12 4c7 0 11 8 11 8a20.4 20.4 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+
+          <div class="checkbox-row">
+            <input type="checkbox" id="agreeClub1" required />
+            <label for="agreeClub1">
+              I've read and agree with the <a class="inline-link" href="#">Terms and conditions</a>,
+              <a class="inline-link" href="#">Privacy policy</a>, and the
+              <a class="inline-link" href="#">Community guidelines</a>.
+            </label>
+          </div>
+
+          <div class="checkbox-row">
+            <input type="checkbox" id="agreeClub2" required />
+            <label for="agreeClub2">By checking this box, I confirm I am 17 years of age or older.</label>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Sign up</button>
+        </form>
+
+        <a class="text-link-center" href="#" data-go-to-login>I already have an account</a>
+      </div>
+
+      <div class="spacer"></div>
+
+      <p class="footer-note">
+        This independent student project is not affiliated<br />
+        with the University of British Columbia.
+      </p>
+    </section>
+
+    <!-- ============================================================
+         CONFIRMATION CODE
+    ============================================================= -->
+    <section class="view" data-view="confirmation">
+      <div class="header tight">
+        <h1 class="title">Enter confirmation code</h1>
+        <p class="subtitle">A 4-digit code was sent to<br /><span id="emailTarget">your email</span></p>
+      </div>
+
+      <div id="confirmBanner" class="form-banner" role="alert"></div>
+
+      <div class="code-inputs">
+        <input type="tel" inputmode="numeric" maxlength="1" aria-label="Digit 1" />
+        <input type="tel" inputmode="numeric" maxlength="1" aria-label="Digit 2" />
+        <input type="tel" inputmode="numeric" maxlength="1" aria-label="Digit 3" />
+        <input type="tel" inputmode="numeric" maxlength="1" aria-label="Digit 4" />
+      </div>
+
+      <a id="resendLink" class="resend-link" href="#">Resend code</a>
+
+      <button id="continueBtn" class="btn btn-primary" aria-disabled="true">Continue</button>
+
+      <div class="spacer"></div>
+    </section>
+
+    <!-- ============================================================
+         CLUB PROFILE (admin sees Post Event, students see Follow)
+    ============================================================= -->
+    <section class="view" data-view="club-profile">
+      <div class="profile-topbar">
+        <div class="profile-topbar-row">
+          <button class="icon-btn" type="button" data-open-nav aria-label="Menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <button class="icon-btn" type="button" id="roleDemoToggle" aria-label="Toggle demo view" title="Demo only: switch between admin and guest view">
+            <svg class="role-icon-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          </button>
+        </div>
+
+        <div class="profile-identity">
+          <div class="avatar-circle">
+            <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+          </div>
+          <div class="profile-identity-text">
+            <div class="profile-name-row">
+              <h1>Loading&hellip;</h1>
+              <button class="icon-btn" type="button" data-role-only="admin" aria-label="Edit profile">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+              </button>
+            </div>
+            <p class="profile-bio">Loading organization details from the backend&hellip;</p>
+          </div>
+        </div>
+
+        <button class="btn-action" type="button" id="profileActionBtn" data-role-only="admin" data-go-to="post-event">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          Post event
+        </button>
+
+        <button class="btn-action" type="button" id="followBtn" data-role-only="guest">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          <span id="followBtnLabel">Follow</span>
+        </button>
+      </div>
+
+      <div class="tab-pills">
+        <button class="tab-pill active" type="button" data-events-tab="current">Current events</button>
+        <button class="tab-pill" type="button" data-events-tab="past">Past events</button>
+      </div>
+
+      <div class="profile-body">
+        <h2 class="section-label" id="eventsSectionLabel">Scheduled events</h2>
+
+        <div class="event-carousel">
+          <button class="carousel-arrow" type="button" data-scroll="-1" aria-label="Scroll left">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+
+          <div class="carousel-track" id="eventsTrack">
+            <p style="opacity:.6;padding:8px;">Loading events&hellip;</p>
+          </div>
+
+          <button class="carousel-arrow" type="button" data-scroll="1" aria-label="Scroll right">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         EVENT DETAIL
+    ============================================================= -->
+    <section class="view" data-view="event-detail">
+      <div class="event-detail-topbar">
+        <button class="icon-btn" type="button" data-go-to="club-profile" aria-label="Back">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="icon-actions">
+          <button class="icon-btn" type="button" aria-label="Report event">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          </button>
+          <button class="icon-btn" type="button" id="favoriteBtn" aria-label="Save event">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="event-detail-image"></div>
+
+      <div class="event-detail-card">
+        <div class="avatar-circle">
+          <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+        </div>
+
+        <h2 id="eventDetailTitle">Event title</h2>
+
+        <div class="event-detail-row">
+          <div class="event-detail-field">
+            <h3>Date</h3>
+            <p id="eventDetailDate">&mdash;</p>
+          </div>
+          <div class="event-detail-field">
+            <h3>Time</h3>
+            <p id="eventDetailTime">&mdash;</p>
+          </div>
+        </div>
+
+        <div class="event-detail-field" style="margin-bottom:16px;">
+          <h3>Location</h3>
+          <p id="eventDetailLocation">&mdash;</p>
+        </div>
+
+        <div class="event-detail-field event-detail-desc" style="margin-bottom:16px;">
+          <h3>Description</h3>
+          <p id="eventDetailDescription">&mdash;</p>
+        </div>
+
+        <div class="event-detail-field">
+          <h3>Tags</h3>
+          <div class="tag-list" id="eventDetailTags"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         POST EVENT
+    ============================================================= -->
+    <section class="view" data-view="post-event">
+      <div class="post-event-topbar">
+        <span class="post-event-title">Post new event</span>
+        <button class="icon-btn" type="button" aria-label="Discard event" id="discardEventBtn" data-go-to="club-profile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
+      </div>
+
+      <div id="postEventBanner" class="form-banner"></div>
+
+      <form id="postEventForm" novalidate>
+        <div class="field-group">
+          <label class="field-label" for="eventTitleInput">Event title</label>
+          <input class="field-plain" id="eventTitleInput" name="title" type="text" placeholder="Enter a title" required />
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Date</label>
+          <div class="select-row">
+            <select name="month" required>
+              <option value="" disabled selected>Month</option>
+              <option>Jan</option><option>Feb</option><option>Mar</option><option>Apr</option>
+              <option>May</option><option>Jun</option><option>Jul</option><option>Aug</option>
+              <option>Sep</option><option>Oct</option><option>Nov</option><option>Dec</option>
+            </select>
+            <select name="day" required>
+              <option value="" disabled selected>Day</option>
+              <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option>13</option><option>14</option><option>15</option><option>16</option><option>17</option><option>18</option><option>19</option><option>20</option><option>21</option><option>22</option><option>23</option><option>24</option><option>25</option><option>26</option><option>27</option><option>28</option><option>29</option><option>30</option><option>31</option>
+            </select>
+            <select name="year" required>
+              <option value="" disabled selected>Year</option>
+              <option>2026</option><option>2027</option><option>2028</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="time-groups">
+          <div>
+            <label class="field-label">Start time</label>
+            <div class="time-row">
+              <input type="time" name="startTime" required />
+              <select name="startPeriod">
+                <option>AM</option><option>PM</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="field-label">End time</label>
+            <div class="time-row">
+              <input type="time" name="endTime" required />
+              <select name="endPeriod">
+                <option>AM</option><option>PM</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="eventLocationInput">Location</label>
+          <input class="field-plain" id="eventLocationInput" name="location" type="text" placeholder="Enter a location" required />
+        </div>
+
+        <button type="button" class="upload-dropzone" id="flyerUploadBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          <span id="flyerUploadLabel">Click to upload a flyer</span>
+        </button>
+        <input type="file" id="flyerFileInput" accept="image/*,application/pdf" class="visually-hidden" />
+
+        <div class="field-group">
+          <label class="field-label" for="eventDescriptionInput">Description</label>
+          <textarea class="field-textarea" id="eventDescriptionInput" name="description" placeholder="What should people know?"></textarea>
+        </div>
+
+        <div class="checkbox-row">
+          <input type="checkbox" id="agreePostEvent" required />
+          <label for="agreePostEvent">I've read and agree with the <a class="inline-link" href="#">Community guidelines</a>.</label>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-post-event">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          Post event
+        </button>
+      </form>
+
+      <div class="spacer"></div>
+    </section>
+
+    <!-- ============================================================
+         SEARCH
+    ============================================================= -->
+    <section class="view" data-view="search">
+      <div class="search-menu-row">
+        <button class="icon-btn" type="button" data-open-nav aria-label="Menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="search-bar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" placeholder="Search" autocomplete="off" />
+        <button class="icon-btn" type="button" data-go-to="filters" aria-label="Open filters">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="search-tabs">
+        <button class="search-tab" type="button" data-search-tab="events">Events</button>
+        <button class="search-tab active" type="button" data-search-tab="organizers">Event organizers</button>
+      </div>
+
+      <p class="recent-searches-label">Recent searches</p>
+
+      <div id="recentSearchesList">
+        <div class="recent-search-item">
+          <span>First year events</span>
+          <button class="recent-search-remove" type="button" aria-label="Remove">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="4" x2="16" y2="16"/><line x1="16" y1="4" x2="4" y2="16"/></svg>
+          </button>
+        </div>
+        <div class="recent-search-item">
+          <span>Faculty of Science events</span>
+          <button class="recent-search-remove" type="button" aria-label="Remove">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="4" x2="16" y2="16"/><line x1="16" y1="4" x2="4" y2="16"/></svg>
+          </button>
+        </div>
+        <div class="recent-search-item">
+          <span>Women in Engineering events</span>
+          <button class="recent-search-remove" type="button" aria-label="Remove">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="4" y1="4" x2="16" y2="16"/><line x1="16" y1="4" x2="4" y2="16"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         FILTERS
+    ============================================================= -->
+    <section class="view" data-view="filters">
+      <div class="filter-topbar">
+        <button type="button" data-go-to="search">Cancel</button>
+        <span class="filter-title">Filter</span>
+        <button type="button" id="clearFiltersBtn">Clear all</button>
+      </div>
+
+      <div class="filter-row" id="dateTimeRow">
+        <div class="filter-row-head" id="dateTimeToggle">
+          <span>Date &amp; time</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="calendar-card" id="calendarCard" style="display:none;">
+          <div class="calendar-header">
+            <button class="calendar-nav-btn" type="button" id="calPrevMonth" aria-label="Previous month">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <strong id="calMonthLabel">Month Year</strong>
+            <button class="calendar-nav-btn" type="button" id="calNextMonth" aria-label="Next month">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+          <div class="calendar-grid" id="calendarGrid"></div>
+        </div>
+      </div>
+
+      <div class="filter-row">
+        <div class="filter-row-head" style="cursor:default;">
+          <span>Free events</span>
+          <button class="filter-toggle-switch" id="freeEventsToggle" type="button" aria-label="Toggle free events only"></button>
+        </div>
+      </div>
+
+      <div class="filter-row" style="border-bottom:none;">
+        <div class="filter-section-title">
+          <span>Event type</span>
+          <span class="filter-count-badge" id="eventTypeCount">0</span>
+        </div>
+        <div class="chip-grid" id="eventTypeChips">
+          <!-- Populated from GET /api/tags by app.js -->
+        </div>
+      </div>
+
+      <button class="btn btn-primary" type="button" data-go-to="search">Apply filters</button>
+    </section>
+
+    <!-- ============================================================
+         STUDENT PROFILE
+    ============================================================= -->
+    <section class="view" data-view="guest-profile">
+      <div class="simple-topbar">
+        <div class="simple-topbar-row">
+          <button class="icon-btn" type="button" data-open-nav aria-label="Menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <h1>Guest</h1>
+          <span style="width:24px;"></span>
+        </div>
+      </div>
+
+      <div class="tab-pills">
+        <button class="tab-pill active" type="button" data-guest-tab="saved">Saved events</button>
+        <button class="tab-pill" type="button" data-guest-tab="following">Following</button>
+      </div>
+
+      <div class="profile-body">
+        <div id="savedEventsPanel">
+          <h2 class="section-label">Saved events</h2>
+          <div class="event-carousel">
+            <button class="carousel-arrow" type="button" data-scroll-target="savedEventsTrack" data-scroll="-1" aria-label="Scroll left">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <div class="carousel-track" id="savedEventsTrack">
+              <p style="opacity:.6;padding:8px;font-size:13px;">Save an event to see it here.</p>
+            </div>
+            <button class="carousel-arrow" type="button" data-scroll-target="savedEventsTrack" data-scroll="1" aria-label="Scroll right">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div id="followingPanel" style="display:none;">
+          <h2 class="section-label">Following</h2>
+          <div class="follow-list" id="followingList">
+            <p style="opacity:.6;font-size:13px;">Follow an organization to see it here.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================
+         SETTINGS
+    ============================================================= -->
+    <section class="view" data-view="settings">
+      <div class="settings-topbar">
+        <button class="icon-btn" type="button" data-open-nav aria-label="Menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h1>Settings</h1>
+        <p class="settings-username">Guest</p>
+      </div>
+
+      <div class="settings-list">
+        <button class="settings-row" type="button">
+          <span>Support &amp; feedback</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <button class="settings-row" type="button">
+          <span>Privacy and legal</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============================================================
+       NAV DRAWER (opened from any hamburger icon)
+  ============================================================= -->
+  <div class="nav-drawer-backdrop" id="navBackdrop"></div>
+  <nav class="nav-drawer" id="navDrawer">
+    <h2>Menu</h2>
+    <button class="nav-drawer-link" type="button" data-go-to="club-profile">Club profile</button>
+    <button class="nav-drawer-link" type="button" data-go-to="search">Search</button>
+    <button class="nav-drawer-link" type="button" data-go-to="guest-profile">My profile</button>
+    <button class="nav-drawer-link" type="button" data-go-to="settings">Settings</button>
+    <button class="nav-drawer-link" type="button" data-go-to="welcome">Log out</button>
+  </nav>
+
+  <script src="main.js"></script>
+</body>
+</html>
