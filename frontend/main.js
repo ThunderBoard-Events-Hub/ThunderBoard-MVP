@@ -2,6 +2,72 @@
 // Previously split into api.js / router.js / app.js — combined here into one file.
 
 // ============================================================
+// SECTION 0: AUTH — Auth0 SPA SDK wrapper
+// ============================================================
+// Organizations have no password of their own — Auth0 is the only way to
+// authenticate as one (see backend/API_CONTRACT.md#auth). Domain/audience
+// match the backend's AUTH0_DOMAIN / AUTH0_AUDIENCE app settings; the client
+// ID is the same one used by auth0-poc/ against this tenant.
+// NOTE: if that POC client isn't meant to back production, swap in a
+// dedicated Auth0 application's client ID here, and make sure this site's
+// origin is added to that application's Allowed Callback/Logout/Web Origin URLs.
+
+const AUTH0_DOMAIN = 'annhasna.ca.auth0.com';
+const AUTH0_CLIENT_ID = 'Q4GaBMfYcHlcE3zOpn4LzkKdpKlKHPDE';
+const AUTH0_AUDIENCE = 'https://thunderboard-api';
+
+const Auth = (() => {
+  let client = null;
+
+  async function init() {
+    client = await auth0.createAuth0Client({
+      domain: AUTH0_DOMAIN,
+      clientId: AUTH0_CLIENT_ID,
+      authorizationParams: {
+        redirect_uri: `${location.origin}${location.pathname}`,
+        audience: AUTH0_AUDIENCE,
+      },
+    });
+
+    if (location.search.includes('code=') && location.search.includes('state=')) {
+      try {
+        await client.handleRedirectCallback();
+      } catch (err) {
+        console.error('Auth0 redirect callback failed:', err);
+      }
+      history.replaceState({}, '', location.pathname);
+    }
+
+    return client.isAuthenticated();
+  }
+
+  function login(screenHint) {
+    return client.loginWithRedirect(
+      screenHint ? { authorizationParams: { screen_hint: screenHint } } : undefined
+    );
+  }
+
+  function logout() {
+    return client.logout({ logoutParams: { returnTo: `${location.origin}${location.pathname}` } });
+  }
+
+  const getUser = () => client.getUser();
+  const isLoggedIn = () => client.isAuthenticated();
+
+  async function getToken() {
+    try {
+      return await client.getTokenSilently();
+    } catch (err) {
+      console.error('Failed to get Auth0 access token:', err);
+      return null;
+    }
+  }
+
+  return { init, login, logout, getUser, getToken, isLoggedIn };
+})();
+
+
+// ============================================================
 // SECTION 1: API — thin fetch wrapper around the backend
 // ============================================================
 // NOTE: the backend's CORS only allows requests from whatever FRONTEND_URL
@@ -13,10 +79,14 @@ const API_BASE = location.hostname === 'localhost' || location.hostname === '127
   : 'https://thunderboard-api.azurewebsites.net/api';
 
 async function request(path, options = {}) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    ...options,
-  });
+  const { auth, headers, ...rest } = options;
+  const finalHeaders = { 'Content-Type': 'application/json', ...(headers || {}) };
+  if (auth) {
+    const token = await Auth.getToken();
+    if (token) finalHeaders.Authorization = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, { ...rest, headers: finalHeaders });
 
   // The contract guarantees every non-2xx response is { error: "..." }
   if (!res.ok) {
@@ -27,7 +97,9 @@ async function request(path, options = {}) {
     } catch {
       /* ignore non-JSON error bodies */
     }
-    throw new Error(message);
+    const err = new Error(message);
+    err.status = res.status;
+    throw err;
   }
 
   if (res.status === 204) return null;
@@ -49,9 +121,14 @@ const Api = {
   searchOrganizations: (name) => request(`/organizations/search?name=${encodeURIComponent(name)}`),
   followOrganization: (id) => request(`/organizations/${id}/follow`, { method: 'POST' }),
   unfollowOrganization: (id) => request(`/organizations/${id}/unfollow`, { method: 'POST' }),
+  getMyOrganization: () => request('/organizations/me', { auth: true }),
+  createOrganization: (data) => request('/organizations', { method: 'POST', body: JSON.stringify(data), auth: true }),
 
   // Tags
   getTags: () => request('/tags'),
+
+  // Admin
+  isAdmin: () => request('/admin/me', { auth: true }),
 };
 
 
@@ -107,6 +184,21 @@ const Router = (() => {
           el.style.display = el.dataset.roleOnly === 'guest' ? '' : 'none';
         });
         showView('guest-profile');
+        return;
+      }
+
+      if (e.target.closest('#loginBtn')) {
+        Auth.login();
+        return;
+      }
+
+      if (e.target.closest('#signupStartBtn')) {
+        Auth.login('signup');
+        return;
+      }
+
+      if (e.target.closest('#logoutBtn')) {
+        Auth.isLoggedIn().then((loggedIn) => (loggedIn ? Auth.logout() : showView('welcome')));
         return;
       }
 
@@ -227,7 +319,7 @@ const Router = (() => {
     showView('welcome');
   }
 
-  return { init, showView, getCurrentView };
+  return { init, showView, getCurrentView, showAccountVariant };
 })();
 
 
@@ -323,6 +415,91 @@ async function loadClubProfile() {
   }
 }
 
+// Renders the signed-in org's own profile (from GET /organizations/me,
+// which — unlike the public listing — also returns pending/rejected orgs).
+function renderOwnOrgProfile(org) {
+  document.body.dataset.role = 'admin';
+  document.querySelectorAll('[data-role-only]').forEach((el) => {
+    el.style.display = el.dataset.roleOnly === 'admin' ? '' : 'none';
+  });
+
+  state.demoOrgId = org.id;
+
+  document.querySelector('[data-view="club-profile"] h1').textContent = org.name;
+
+  const statusNote = {
+    pending: ' — pending admin approval, not visible publicly yet.',
+    rejected: ' — application was declined. Contact us for details.',
+  }[org.approval_status] || '';
+  document.querySelector('[data-view="club-profile"] .profile-bio').textContent =
+    (org.description || 'No description yet.') + statusNote;
+
+  // Posting events requires an approved org profile (see API_CONTRACT.md).
+  const postBtn = document.getElementById('profileActionBtn');
+  if (postBtn) postBtn.style.display = org.approval_status === 'approved' ? '' : 'none';
+
+  Api.getEventsByOrganizer(org.id)
+    .then((events) => {
+      state.events = events;
+      renderEventList(document.getElementById('eventsTrack'), events.filter((e) => e.status === 'published'));
+    })
+    .catch((err) => console.error('Failed to load events for own org:', err));
+}
+
+// Auth0 signup only creates the login identity — step 2 collects the actual
+// org profile (name/description) needed for POST /api/organizations.
+function showOrgSignupStep() {
+  Router.showView('create-account');
+  Router.showAccountVariant('club');
+  document.querySelector('[data-signup-step="start"]').hidden = true;
+  document.getElementById('signupFormClub').hidden = false;
+}
+
+function wireSignupForm() {
+  const form = document.getElementById('signupFormClub');
+  if (!form) return;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const banner = form.parentElement.querySelector('.form-banner');
+    if (banner) banner.textContent = '';
+    try {
+      const user = await Auth.getUser();
+      const org = await Api.createOrganization({
+        name: form.elements.name.value.trim(),
+        email: user?.email,
+        description: form.elements.description.value.trim() || undefined,
+      });
+      renderOwnOrgProfile(org);
+      Router.showView('club-profile');
+    } catch (err) {
+      if (banner) banner.textContent = err.message;
+    }
+  });
+}
+
+async function initAuth() {
+  let isAuthenticated = false;
+  try {
+    isAuthenticated = await Auth.init();
+  } catch (err) {
+    console.error('Auth0 init failed:', err);
+    return;
+  }
+  if (!isAuthenticated) return;
+
+  try {
+    const org = await Api.getMyOrganization();
+    renderOwnOrgProfile(org);
+    Router.showView('club-profile');
+  } catch (err) {
+    if (err.status === 404) {
+      showOrgSignupStep();
+    } else {
+      console.error('Failed to load own organization:', err);
+    }
+  }
+}
+
 async function loadFilterTags() {
   try {
     const tags = await Api.getTags();
@@ -409,6 +586,8 @@ document.addEventListener('tab:events', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
   Router.init();
   wireFollowButton();
+  wireSignupForm();
   loadClubProfile();
   loadFilterTags();
+  initAuth(); // runs last so a signed-in org's own profile overrides the public demo one above
 });

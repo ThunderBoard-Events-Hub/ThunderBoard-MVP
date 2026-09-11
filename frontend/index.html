@@ -36,29 +36,12 @@
     <section class="view" data-view="login">
       <div class="header">
         <h1 class="title">Log in</h1>
+        <p class="subtitle">You'll be redirected to our secure sign-in page.</p>
       </div>
 
       <div id="loginBanner" class="form-banner" role="alert"></div>
 
-      <form id="loginForm" novalidate>
-        <div class="field">
-          <svg class="icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
-          <input name="email" type="email" placeholder="UBC email" required autocomplete="email" />
-        </div>
-
-        <div class="field">
-          <svg class="icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-          <input id="loginPassword" name="password" type="password" placeholder="Password" required autocomplete="current-password" />
-          <button type="button" class="icon-right toggle-password" data-target="loginPassword" aria-label="Show password">
-            <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.3 20.3 0 0 1 5.06-5.94M9.9 4.24A10.4 10.4 0 0 1 12 4c7 0 11 8 11 8a20.4 20.4 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-            <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-          </button>
-        </div>
-
-        <a class="forgot-link" href="#">Forgot your password?</a>
-
-        <button type="submit" class="btn btn-primary">Sign in</button>
-      </form>
+      <button id="loginBtn" class="btn btn-primary" type="button">Continue to sign in</button>
 
       <a id="goToSignup" class="text-link-center" href="#">Create an account</a>
 
@@ -89,28 +72,22 @@
 
         <div class="form-banner"></div>
 
-        <form id="signupFormClub" novalidate>
-          <div class="field">
-            <svg class="icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>
-            <input name="email" type="email" placeholder="yourgroup@ubc.ca" required autocomplete="email" />
+        <!-- Step 1: Auth0 handles the actual signup (email/password or SSO). -->
+        <div data-signup-step="start">
+          <button id="signupStartBtn" class="btn btn-primary" type="button">Continue to sign up</button>
+        </div>
+
+        <!-- Step 2: after Auth0 signup, collect the org profile itself
+             (POST /api/organizations needs a name; email comes from Auth0). -->
+        <form id="signupFormClub" novalidate hidden>
+          <div class="field-group">
+            <label class="field-label" for="orgNameInput">Organization name</label>
+            <input class="field-plain" id="orgNameInput" name="name" type="text" placeholder="Engineering Undergraduate Society" required />
           </div>
 
-          <div class="field">
-            <svg class="icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-            <input id="pw1c" name="password" type="password" placeholder="Password" required autocomplete="new-password" />
-            <button type="button" class="icon-right toggle-password" data-target="pw1c" aria-label="Show password">
-              <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.3 20.3 0 0 1 5.06-5.94M9.9 4.24A10.4 10.4 0 0 1 12 4c7 0 11 8 11 8a20.4 20.4 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-              <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
-          </div>
-
-          <div class="field">
-            <svg class="icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-            <input id="pw2c" name="confirmPassword" type="password" placeholder="Confirm password" required autocomplete="new-password" />
-            <button type="button" class="icon-right toggle-password" data-target="pw2c" aria-label="Show password">
-              <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.3 20.3 0 0 1 5.06-5.94M9.9 4.24A10.4 10.4 0 0 1 12 4c7 0 11 8 11 8a20.4 20.4 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-              <svg class="eye-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </button>
+          <div class="field-group">
+            <label class="field-label" for="orgDescriptionInput">Description</label>
+            <textarea class="field-textarea" id="orgDescriptionInput" name="description" placeholder="What does your group do?"></textarea>
           </div>
 
           <div class="checkbox-row">
@@ -127,7 +104,7 @@
             <label for="agreeClub2">By checking this box, I confirm I am 17 years of age or older.</label>
           </div>
 
-          <button type="submit" class="btn btn-primary">Sign up</button>
+          <button type="submit" class="btn btn-primary">Create organization profile</button>
         </form>
 
         <a class="text-link-center" href="#" data-go-to-login>I already have an account</a>
@@ -551,9 +528,10 @@
     <button class="nav-drawer-link" type="button" data-go-to="search">Search</button>
     <button class="nav-drawer-link" type="button" data-go-to="guest-profile">My profile</button>
     <button class="nav-drawer-link" type="button" data-go-to="settings">Settings</button>
-    <button class="nav-drawer-link" type="button" data-go-to="welcome">Log out</button>
+    <button class="nav-drawer-link" type="button" id="logoutBtn">Log out</button>
   </nav>
 
+  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.18/auth0-spa-js.production.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
