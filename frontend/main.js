@@ -88,7 +88,10 @@ const API_BASE = location.hostname === 'localhost' || location.hostname === '127
 
 async function request(path, options = {}) {
   const { auth, headers, ...rest } = options;
-  const finalHeaders = { 'Content-Type': 'application/json', ...(headers || {}) };
+  // FormData bodies (flyer/logo uploads) need the browser to set their own
+  // multipart boundary — a manual Content-Type here would break that.
+  const isFormData = rest.body instanceof FormData;
+  const finalHeaders = { ...(isFormData ? {} : { 'Content-Type': 'application/json' }), ...(headers || {}) };
   if (auth) {
     const token = await Auth.getToken();
     if (token) finalHeaders.Authorization = `Bearer ${token}`;
@@ -122,6 +125,7 @@ const Api = {
   getEventsByTags: (tagIds) => request(`/events/tags?tag_ids=${tagIds.join(',')}`),
   getEventsByOrganizer: (organizerId) => request(`/events/organizer/${organizerId}`),
   getEventTags: (eventId) => request(`/events/${eventId}/tags`),
+  createEvent: (formData) => request('/events', { method: 'POST', body: formData, auth: true }),
 
   // Organizations
   getOrganizations: () => request('/organizations'),
@@ -340,6 +344,7 @@ const state = {
   organizations: [],
   events: [],
   demoOrgId: null, // which org's profile we're showing on the club-profile view
+  selectedFlyerFile: null,
 };
 
 const FOLLOWED_KEY = 'thunderboard:followed'; // backend doesn't track "who" follows, see API_CONTRACT
@@ -578,6 +583,63 @@ function wireFollowButton() {
   });
 }
 
+function wireFlyerUpload() {
+  const btn = document.getElementById('flyerUploadBtn');
+  const input = document.getElementById('flyerFileInput');
+  const label = document.getElementById('flyerUploadLabel');
+  if (!btn || !input) return;
+
+  btn.addEventListener('click', () => input.click());
+
+  input.addEventListener('change', () => {
+    const file = input.files[0] || null;
+    state.selectedFlyerFile = file;
+    if (label) label.textContent = file ? file.name : 'Click to upload a flyer';
+  });
+}
+
+const POST_EVENT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function wirePostEventForm() {
+  const form = document.getElementById('postEventForm');
+  if (!form) return;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!form.reportValidity()) return;
+
+    const banner = document.getElementById('postEventBanner');
+    if (banner) banner.textContent = '';
+
+    const fields = form.elements;
+    const monthNum = POST_EVENT_MONTHS.indexOf(fields.month.value) + 1;
+    const startDate = `${fields.year.value}-${String(monthNum).padStart(2, '0')}-${String(fields.day.value).padStart(2, '0')}`;
+
+    const body = new FormData();
+    body.append('title', fields.title.value.trim());
+    body.append('start_date', startDate);
+    if (fields.startTime.value) body.append('start_time', fields.startTime.value);
+    if (fields.endTime.value) body.append('end_time', fields.endTime.value);
+    if (fields.location.value.trim()) body.append('location', fields.location.value.trim());
+    if (fields.description.value.trim()) body.append('description', fields.description.value.trim());
+    if (state.selectedFlyerFile) body.append('image', state.selectedFlyerFile);
+
+    try {
+      await Api.createEvent(body);
+      form.reset();
+      state.selectedFlyerFile = null;
+      const flyerLabel = document.getElementById('flyerUploadLabel');
+      if (flyerLabel) flyerLabel.textContent = 'Click to upload a flyer';
+
+      const org = await Api.getMyOrganization();
+      renderOwnOrgProfile(org);
+      Router.showView('club-profile');
+    } catch (err) {
+      if (banner) banner.textContent = err.message;
+    }
+  });
+}
+
 document.addEventListener('event:open', (e) => {
   const id = e.detail.el?.dataset?.eventId;
   if (id) openEventDetail(id);
@@ -598,6 +660,8 @@ document.addEventListener('DOMContentLoaded', () => {
   Router.init();
   wireFollowButton();
   wireSignupForm();
+  wireFlyerUpload();
+  wirePostEventForm();
   loadClubProfile();
   loadFilterTags();
   initAuth(); // runs last so a signed-in org's own profile overrides the public demo one above
