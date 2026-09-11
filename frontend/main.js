@@ -153,8 +153,14 @@ const Api = {
 
 const Router = (() => {
   let currentView = 'welcome';
+  // Small history stack so "back" buttons (e.g. on legal pages) can return
+  // wherever the user came from, instead of a hardcoded destination.
+  let viewHistory = [];
 
-  function showView(name) {
+  function showView(name, opts = {}) {
+    if (!opts.skipHistory && name !== currentView) {
+      viewHistory.push(currentView);
+    }
     document.querySelectorAll('.view').forEach((el) => {
       el.classList.toggle('active', el.dataset.view === name);
     });
@@ -162,6 +168,12 @@ const Router = (() => {
     closeNav();
     // Let app.js know a view became visible, in case it needs to (re)fetch data.
     document.dispatchEvent(new CustomEvent('view:show', { detail: { name } }));
+  }
+
+  // Returns to whatever view was showing before the current one.
+  function goBack(fallback = 'welcome') {
+    const prev = viewHistory.pop();
+    showView(prev || fallback, { skipHistory: true });
   }
 
   function getCurrentView() {
@@ -211,6 +223,12 @@ const Router = (() => {
 
       if (e.target.closest('#logoutBtn')) {
         Auth.isLoggedIn().then((loggedIn) => (loggedIn ? Auth.logout() : showView('welcome')));
+        return;
+      }
+
+      const backTrigger = e.target.closest('[data-go-back]');
+      if (backTrigger) {
+        goBack();
         return;
       }
 
@@ -331,7 +349,7 @@ const Router = (() => {
     showView('welcome');
   }
 
-  return { init, showView, getCurrentView, showAccountVariant };
+  return { init, showView, goBack, getCurrentView, showAccountVariant };
 })();
 
 
