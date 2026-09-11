@@ -420,6 +420,47 @@ input:focus-visible {
   color: #a6e9c1;
 }
 
+.admin-org-card {
+  background: #fff;
+  border: 1px solid #E7E9EE;
+  border-radius: var(--radius-field);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.admin-org-card h3 {
+  font-size: 15px;
+  margin: 0 0 4px;
+  color: var(--ink);
+}
+
+.admin-org-email,
+.admin-org-desc {
+  font-size: 13px;
+  color: #5a6072;
+  margin: 0 0 4px;
+}
+
+.admin-org-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.admin-org-actions .btn {
+  flex: 1;
+  width: auto;
+  height: 40px;
+  line-height: 40px;
+  font-size: 13px;
+}
+
+.admin-org-actions .btn-decline {
+  background: none;
+  border: 1px solid #E7E9EE;
+  color: var(--ink);
+}
+
 .btn-primary.is-loading {
   opacity: 0.75;
   pointer-events: none;
