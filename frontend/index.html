@@ -516,6 +516,29 @@
       </div>
     </section>
 
+    <!-- ============================================================
+         ADMIN PANEL (visible only to accounts on the backend's fixed
+         admin allowlist — see GET /api/admin/me)
+    ============================================================= -->
+    <section class="view" data-view="admin-panel">
+      <div class="settings-topbar">
+        <button class="icon-btn" type="button" data-open-nav aria-label="Menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h1>Admin panel</h1>
+        <span style="width:24px;"></span>
+      </div>
+
+      <div id="adminPanelBanner" class="form-banner"></div>
+
+      <div class="profile-body">
+        <h2 class="section-label">Pending organizations</h2>
+        <div id="pendingOrgsList">
+          <p style="opacity:.6;padding:8px;">Loading&hellip;</p>
+        </div>
+      </div>
+    </section>
+
   </div>
 
   <!-- ============================================================
@@ -528,6 +551,7 @@
     <button class="nav-drawer-link" type="button" data-go-to="search">Search</button>
     <button class="nav-drawer-link" type="button" data-go-to="guest-profile">My profile</button>
     <button class="nav-drawer-link" type="button" data-go-to="settings">Settings</button>
+    <button class="nav-drawer-link" type="button" id="adminNavLink" data-go-to="admin-panel" hidden>Admin panel</button>
     <button class="nav-drawer-link" type="button" id="logoutBtn">Log out</button>
   </nav>
 

@@ -117,6 +117,14 @@ async function request(path, options = {}) {
   return res.json();
 }
 
+// .form-banner is display:none until it gets the .visible class (style.css).
+function showBanner(el, message, kind = 'error') {
+  if (!el) return;
+  el.textContent = message;
+  el.classList.toggle('success', kind === 'success');
+  el.classList.toggle('visible', Boolean(message));
+}
+
 const Api = {
   // Events
   getEvents: () => request('/events'),
@@ -135,6 +143,9 @@ const Api = {
   unfollowOrganization: (id) => request(`/organizations/${id}/unfollow`, { method: 'POST' }),
   getMyOrganization: () => request('/organizations/me', { auth: true }),
   createOrganization: (data) => request('/organizations', { method: 'POST', body: JSON.stringify(data), auth: true }),
+  getPendingOrganizations: () => request('/organizations/pending', { auth: true }),
+  approveOrganization: (id) => request(`/organizations/${id}/approve`, { method: 'POST', auth: true }),
+  declineOrganization: (id) => request(`/organizations/${id}/decline`, { method: 'POST', auth: true }),
 
   // Tags
   getTags: () => request('/tags'),
@@ -474,7 +485,7 @@ function wireSignupForm() {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const banner = form.parentElement.querySelector('.form-banner');
-    if (banner) banner.textContent = '';
+    showBanner(banner, '');
     try {
       const user = await Auth.getUser();
       const org = await Api.createOrganization({
@@ -485,7 +496,7 @@ function wireSignupForm() {
       renderOwnOrgProfile(org);
       Router.showView('club-profile');
     } catch (err) {
-      if (banner) banner.textContent = err.message;
+      showBanner(banner, err.message);
     }
   });
 }
@@ -497,8 +508,7 @@ async function initAuth() {
   } catch (err) {
     console.error('Auth0 login failed:', err);
     Router.showView('login');
-    const banner = document.getElementById('loginBanner');
-    if (banner) banner.textContent = err.message;
+    showBanner(document.getElementById('loginBanner'), err.message);
     return;
   }
   if (!isAuthenticated) return;
@@ -513,6 +523,14 @@ async function initAuth() {
     } else {
       console.error('Failed to load own organization:', err);
     }
+  }
+
+  try {
+    const { isAdmin } = await Api.isAdmin();
+    const navLink = document.getElementById('adminNavLink');
+    if (navLink) navLink.hidden = !isAdmin;
+  } catch (err) {
+    console.error('Failed to check admin status:', err);
   }
 }
 
@@ -609,7 +627,7 @@ function wirePostEventForm() {
     if (!form.reportValidity()) return;
 
     const banner = document.getElementById('postEventBanner');
-    if (banner) banner.textContent = '';
+    showBanner(banner, '');
 
     const fields = form.elements;
     const monthNum = POST_EVENT_MONTHS.indexOf(fields.month.value) + 1;
@@ -635,10 +653,67 @@ function wirePostEventForm() {
       renderOwnOrgProfile(org);
       Router.showView('club-profile');
     } catch (err) {
-      if (banner) banner.textContent = err.message;
+      showBanner(banner, err.message);
     }
   });
 }
+
+function renderPendingOrg(org) {
+  const card = document.createElement('div');
+  card.className = 'admin-org-card';
+  card.innerHTML = `
+    <h3></h3>
+    <p class="admin-org-email"></p>
+    <p class="admin-org-desc"></p>
+    <div class="admin-org-actions">
+      <button type="button" class="btn btn-primary" data-approve>Approve</button>
+      <button type="button" class="btn btn-decline" data-decline>Decline</button>
+    </div>
+  `;
+  card.querySelector('h3').textContent = org.name;
+  card.querySelector('.admin-org-email').textContent = org.email;
+  card.querySelector('.admin-org-desc').textContent = org.description || 'No description provided.';
+  card.querySelector('[data-approve]').addEventListener('click', () => handleAdminDecision(org.id, 'approve', card));
+  card.querySelector('[data-decline]').addEventListener('click', () => handleAdminDecision(org.id, 'decline', card));
+  return card;
+}
+
+async function handleAdminDecision(id, action, card) {
+  const banner = document.getElementById('adminPanelBanner');
+  showBanner(banner, '');
+  try {
+    if (action === 'approve') await Api.approveOrganization(id);
+    else await Api.declineOrganization(id);
+    card.remove();
+    if (!document.getElementById('pendingOrgsList').children.length) {
+      document.getElementById('pendingOrgsList').innerHTML =
+        '<p style="opacity:.6;padding:8px;">No pending organizations.</p>';
+    }
+  } catch (err) {
+    showBanner(banner, err.message);
+  }
+}
+
+async function loadAdminPanel() {
+  const list = document.getElementById('pendingOrgsList');
+  if (!list) return;
+  list.innerHTML = '<p style="opacity:.6;padding:8px;">Loading&hellip;</p>';
+  try {
+    const orgs = await Api.getPendingOrganizations();
+    list.innerHTML = '';
+    if (orgs.length === 0) {
+      list.innerHTML = '<p style="opacity:.6;padding:8px;">No pending organizations.</p>';
+      return;
+    }
+    orgs.forEach((org) => list.appendChild(renderPendingOrg(org)));
+  } catch (err) {
+    list.innerHTML = `<p style="opacity:.6;padding:8px;">Couldn't load pending organizations: ${err.message}</p>`;
+  }
+}
+
+document.addEventListener('view:show', (e) => {
+  if (e.detail.name === 'admin-panel') loadAdminPanel();
+});
 
 document.addEventListener('event:open', (e) => {
   const id = e.detail.el?.dataset?.eventId;
