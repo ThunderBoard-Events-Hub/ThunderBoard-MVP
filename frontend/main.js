@@ -4,11 +4,13 @@
 // ============================================================
 // SECTION 1: API — thin fetch wrapper around the backend
 // ============================================================
-// NOTE: the backend's CORS only allows requests from http://localhost:5173
-// (or whatever FRONTEND_URL is set to) — serve this frontend from that origin
-// (e.g. `npx vite` or `npx serve -l 5173`), don't just double-click index.html.
+// NOTE: the backend's CORS only allows requests from whatever FRONTEND_URL
+// is set to on the App Service (or http://localhost:5173 in dev) — make sure
+// that matches wherever this frontend is actually served from.
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+  ? 'http://localhost:8000/api'
+  : 'https://thunderboard-api.azurewebsites.net/api';
 
 async function request(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
